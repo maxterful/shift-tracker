@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shift Tracker</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff; --bg2: #f6f5f2; --bg3: #edebe6;
+  --text: #18181a; --text2: #62625e; --text3: #9a9994;
+  --border: rgba(0,0,0,0.09); --border2: rgba(0,0,0,0.20);
+  --blue: #1558B0; --blue-mid: #2563EB; --blue-bg: #EFF6FF; --blue-border: #BFDBFE;
+  --green: #155228; --green-mid: #16A34A; --green-bg: #F0FDF4; --green-border: #BBF7D0;
+  --amber: #8B4507; --amber-mid: #D97706; --amber-bg: #FFFBEB; --amber-border: #FDE68A;
+  --red: #8B1A1A; --red-mid: #DC2626; --red-bg: #FEF2F2; --red-border: #FECACA;
+  --purple: #4C1D95; --purple-mid: #7C3AED; --purple-bg: #FAF5FF; --purple-border: #DDD6FE;
+  --teal: #0F4440; --teal-mid: #0D9488; --teal-bg: #F0FDFA; --teal-border: #99F6E4;
+  --radius: 8px; --radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18181a; --bg2: #222220; --bg3: #2c2c2a;
+    --text: #f0ede8; --text2: #9a9890; --text3: #636260;
+    --border: rgba(255,255,255,0.09); --border2: rgba(255,255,255,0.20);
+    --blue: #93C5FD; --blue-mid: #60A5FA; --blue-bg: #0D2648; --blue-border: #1E3A5F;
+    --green: #86EFAC; --green-mid: #4ADE80; --green-bg: #052E16; --green-border: #14532D;
+    --amber: #FCD34D; --amber-mid: #FBBF24; --amber-bg: #291700; --amber-border: #451A03;
+    --red: #FCA5A5; --red-mid: #F87171; --red-bg: #2B0A0A; --red-border: #501313;
+    --purple: #D8B4FE; --purple-mid: #C084FC; --purple-bg: #1B0A33; --purple-border: #2E1065;
+    --teal: #5EEAD4; --teal-mid: #2DD4BF; --teal-bg: #041F1E; --teal-border: #042F2E;
+  }
+}
+
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; }
+
+/* ── Login Screen ─────────────────────────────────────────── */
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  background: var(--bg3);
+}
+.login-box {
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+.login-logo { font-size: 32px; margin-bottom: 8px; }
+.login-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+.login-sub { font-size: 14px; color: var(--text2); margin-bottom: 1.5rem; }
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 8px 12px;
+  background: var(--bg2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  color: var(--text);
+  width: 100%;
+}
+.profile-card:hover { border-color: var(--blue-mid); background: var(--blue-bg); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37,99,235,0.15); }
+.profile-avatar {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+}
+.profile-name { font-size: 13px; font-weight: 600; text-align: center; word-break: break-word; line-height: 1.3; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+.login-error { font-size: 13px; color: var(--red-mid); min-height: 18px; margin-top: 8px; text-align: center; }
+.back-link { background: none; border: none; color: var(--blue-mid); font-size: 13px; cursor: pointer; font-family: inherit; padding: 0; margin-bottom: 1.25rem; display: inline-flex; align-items: center; gap: 4px; }
+.back-link:hover { text-decoration: underline; }
+
+/* Emoji / color pickers */
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 4px; }
+.emoji-btn {
+  font-size: 22px;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+  border: 1.5px solid transparent;
+  background: var(--bg2);
+  cursor: pointer;
+  text-align: center;
+  line-height: 1.3;
+  transition: all 0.1s;
+}
+.emoji-btn:hover { background: var(--bg3); }
+.emoji-btn.sel { border-color: var(--blue-mid); background: var(--blue-bg); }
+.color-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.color-btn {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+  outline: none;
+}
+.color-btn:hover { transform: scale(1.2); }
+.color-btn.sel { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg); }
+
+/* ── PIN Modal ────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+.pin-box {
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  padding: 2rem 1.75rem;
+  width: 100%; max-width: 280px;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+}
+.pin-user-emoji { font-size: 36px; line-height: 1; margin-bottom: 6px; }
+.pin-user-name { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+.pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 6px; }
+.pin-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--border2); transition: all 0.12s; }
+.pin-dot.filled { background: var(--blue-mid); transform: scale(1.2); }
+.pin-dot.error { background: var(--red-mid); animation: shake 0.3s ease; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+.pin-error { font-size: 12px; color: var(--red-mid); min-height: 20px; margin-bottom: 12px; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.numpad-btn {
+  font-size: 20px; font-weight: 600;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border2);
+  background: var(--bg2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s;
+  font-family: inherit;
+  line-height: 1;
+}
+.numpad-btn:hover { background: var(--bg3); }
+.numpad-btn:active { background: var(--border2); transform: scale(0.96); }
+.numpad-btn.cancel { font-size: 13px; color: var(--text2); }
+
+/* ── App header / user chip ──────────────────────────────── */
+.app { max-width: 900px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+.header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 10px; }
+.header-left h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.user-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px 5px 7px;
+  border-radius: 99px;
+  border: 1.5px solid var(--border2);
+  background: var(--bg2);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  transition: all 0.12s;
+}
+.user-chip:hover { background: var(--bg3); border-color: var(--blue-mid); }
+.user-chip-emoji { font-size: 17px; line-height: 1; }
+.shift-meta { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+.stat-chip { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sync-chip { font-size: 11px; padding: 3px 8px; border-radius: 99px; display: inline-flex; align-items: center; gap: 5px; border: 0.5px solid var(--border2); color: var(--text3); background: var(--bg2); cursor: default; user-select: none; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background 0.3s; }
+.sync-dot.live { background: var(--green-mid); }
+.sync-dot.saving { background: var(--amber-mid); animation: pulse 0.8s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+/* ── Badges & Buttons ─────────────────────────────────────── */
+.badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; letter-spacing: 0.01em; }
+.badge-open { background: var(--green-bg); color: var(--green-mid); border: 0.5px solid var(--green-border); }
+.badge-closed { background: var(--bg2); color: var(--text2); border: 0.5px solid var(--border2); }
+.btn { font-size: 13px; padding: 8px 15px; border-radius: var(--radius); border: 0.5px solid var(--border2); background: var(--bg); color: var(--text); cursor: pointer; font-family: inherit; font-weight: 500; transition: background 0.12s; min-height: 36px; white-space: nowrap; }
+.btn:hover { background: var(--bg2); }
+.btn-primary { background: var(--blue-mid); color: #fff; border-color: transparent; font-weight: 600; }
+.btn-primary:hover { background: var(--blue); }
+.btn-danger { border-color: var(--red-mid); color: var(--red-mid); }
+.btn-danger:hover { background: var(--red-bg); }
+.btn:disabled { opacity: 0.38; cursor: default; }
+.btn-sm { padding: 5px 10px; font-size: 12px; min-height: 30px; }
+
+/* ── Metric cards ─────────────────────────────────────────── */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 10px; margin-bottom: 1.25rem; }
+.metric-card { border-radius: var(--radius); padding: 14px 16px; border: 0.5px solid var(--border); border-left: 3px solid transparent; background: var(--bg); }
+.metric-card.mc-blue  { border-left-color: var(--blue-mid);   background: var(--blue-bg);   }
+.metric-card.mc-green { border-left-color: var(--green-mid);  background: var(--green-bg);  }
+.metric-card.mc-purp  { border-left-color: var(--purple-mid); background: var(--purple-bg); }
+.metric-card.mc-amber { border-left-color: var(--amber-mid);  background: var(--amber-bg);  }
+.metric-card.mc-teal  { border-left-color: var(--teal-mid);   background: var(--teal-bg);   }
+.metric-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text2); margin-bottom: 7px; }
+.metric-value { font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; color: var(--text); }
+.metric-sub { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.mc-blue .metric-value  { color: var(--blue); }
+.mc-green .metric-value { color: var(--green); }
+.mc-purp .metric-value  { color: var(--purple); }
+.mc-amber .metric-value { color: var(--amber); }
+.mc-teal .metric-value  { color: var(--teal); }
+.progress-bar-wrap { background: var(--border); border-radius: 4px; height: 5px; margin-top: 8px; overflow: hidden; }
+.progress-bar { height: 100%; border-radius: 4px; transition: width 0.4s ease; background: var(--blue-mid); }
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+.tabs-wrap { margin-bottom: 1.25rem; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+.tabs-wrap::-webkit-scrollbar { display: none; }
+.tabs { display: flex; border-bottom: 1.5px solid var(--border); min-width: max-content; }
+.tab { font-size: 13px; padding: 9px 17px; cursor: pointer; border: none; border-bottom: 2px solid transparent; color: var(--text2); background: none; font-family: inherit; font-weight: 500; margin-bottom: -1.5px; transition: color 0.12s; white-space: nowrap; min-height: 40px; }
+.tab.active { color: var(--blue-mid); border-bottom-color: var(--blue-mid); font-weight: 600; }
+.tab:hover:not(.active) { color: var(--text); }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Cards ────────────────────────────────────────────────── */
+.card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+.section-title { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; }
+
+/* ── Category pills ───────────────────────────────────────── */
+.cat-pills { display: flex; flex-wrap: wrap; gap: 7px; }
+.cat-pill { display: flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 99px; border: 1.5px solid; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.12s; white-space: nowrap; background: var(--bg); font-family: inherit; }
+.cat-pill:hover { filter: brightness(0.9); }
+
+/* ── Product list ─────────────────────────────────────────── */
+.product-search { width: 100%; font-size: 14px; padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--bg); color: var(--text); font-family: inherit; margin-bottom: 8px; min-height: 40px; }
+.product-search:focus { outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+.prod-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
+.prod-list-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg2); border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 500; border: 1px solid transparent; transition: all 0.1s; }
+.prod-list-item:hover { border-color: var(--border2); background: var(--bg3); }
+.pli-count { font-size: 11px; color: var(--text3); flex-shrink: 0; background: var(--bg3); padding: 2px 7px; border-radius: 99px; }
+.pli-count.has-sales { background: var(--green-bg); color: var(--green-mid); font-weight: 600; }
+
+/* ── Selected product header ─────────────────────────────── */
+.sel-prod-cat { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text2); margin-bottom: 3px; }
+.sel-prod-name { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+
+/* ── Forms ────────────────────────────────────────────────── */
+.input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.input-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.input-group label { font-size: 12px; font-weight: 600; color: var(--text2); }
+.input-group input, .input-group select, .input-group textarea { font-size: 14px; padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--bg); color: var(--text); font-family: inherit; width: 100%; transition: border-color 0.12s, box-shadow 0.12s; min-height: 40px; }
+.input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+.input-group textarea { min-height: 80px; resize: vertical; }
+/* ── Sale list ────────────────────────────────────────────── */
+.sale-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; }
+.sale-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--bg2); border-radius: var(--radius); font-size: 13px; border-left: 3px solid var(--blue-border); }
+.sale-time { color: var(--text3); min-width: 48px; font-size: 11px; padding-top: 1px; }
+.sale-product { flex: 1; font-weight: 600; color: var(--text); }
+.sale-note { font-size: 11px; color: var(--text2); font-weight: 400; margin-top: 2px; }
+.sale-amount { font-weight: 700; color: var(--text); white-space: nowrap; }
+.sale-commission { font-size: 11px; color: var(--green-mid); font-weight: 600; white-space: nowrap; }
+.sale-guests { font-size: 11px; color: var(--text2); min-width: 32px; text-align: right; padding-top: 2px; }
+.commission-preview { background: var(--bg2); border-radius: var(--radius); padding: 10px 12px; margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+.cp-item { display: flex; flex-direction: column; gap: 2px; }
+.cp-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); }
+.cp-value { font-size: 15px; font-weight: 700; }
+.cp-value.comm { color: var(--green-mid); }
+.cp-value.tax { color: var(--text2); }
+.trash-btn { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 15px; padding: 2px 4px; border-radius: 4px; flex-shrink: 0; line-height: 1; }
+.trash-btn:hover { color: var(--red-mid); background: var(--red-bg); }
+.empty-state { color: var(--text2); font-size: 13px; text-align: center; padding: 2rem; border: 1.5px dashed var(--border2); border-radius: var(--radius); }
+
+/* ── Misc tab styles ──────────────────────────────────────── */
+.quick-guests { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.chart-wrap { position: relative; width: 100%; height: 200px; margin-top: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; font-size: 12px; color: var(--text2); }
+.legend-item { display: flex; align-items: center; gap: 5px; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+/* ── Past shifts ──────────────────────────────────────────── */
+.shift-history-card { background: var(--bg2); border-radius: var(--radius); padding: 14px; margin-bottom: 8px; border-left: 3px solid var(--border2); transition: border-left-color 0.15s; }
+.shift-history-card:hover { border-left-color: var(--blue-mid); }
+.shc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.shc-date { font-size: 13px; font-weight: 700; }
+.shc-duration { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.shc-total { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.shc-goal { font-size: 13px; font-weight: 500; color: var(--green-mid); margin-left: 6px; }
+.shc-goal.miss { color: var(--amber-mid); }
+.shc-stats { font-size: 12px; color: var(--text2); display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+.shc-notes { font-size: 12px; color: var(--text3); margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--border); font-style: italic; }
+.shc-actions { display: flex; align-items: center; gap: 6px; }
+.past-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.past-stat { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; }
+.past-stat-val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.past-stat-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; font-weight: 500; }
+
+/* ── Leaderboard ──────────────────────────────────────────── */
+.period-tabs { display: flex; gap: 4px; }
+.period-tab { font-size: 12px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border2); background: var(--bg); color: var(--text2); cursor: pointer; font-family: inherit; font-weight: 500; transition: all 0.12s; }
+.period-tab.active { background: var(--text); color: var(--bg); border-color: transparent; }
+.lb-list { display: flex; flex-direction: column; gap: 8px; }
+.lb-row { display: flex; align-items: center; gap: 12px; padding: 13px 14px; background: var(--bg2); border-radius: var(--radius); border-left: 3px solid transparent; }
+.lb-row.me   { border-left-color: var(--blue-mid); background: var(--blue-bg); }
+.lb-row.gold { border-left-color: #F59E0B; }
+.lb-row.silver { border-left-color: #9CA3AF; }
+.lb-row.bronze { border-left-color: #B45309; }
+.lb-rank { font-size: 18px; min-width: 28px; text-align: center; }
+.lb-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.lb-info { flex: 1; min-width: 0; }
+.lb-name { font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.you-tag { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; padding: 2px 6px; border-radius: 99px; background: var(--blue-mid); color: #fff; }
+.lb-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.lb-stats { text-align: right; flex-shrink: 0; }
+.lb-total { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.lb-detail { font-size: 11px; color: var(--text2); margin-top: 1px; }
+
+/* ── Admin ────────────────────────────────────────────────── */
+.admin-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 99px; background: #F59E0B; color: #fff; vertical-align: middle; margin-left: 4px; }
+.admin-user-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--border); }
+.admin-user-row:last-child { border-bottom: none; padding-bottom: 0; }
+
+/* ── Mobile ───────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .app { padding: 1rem 0.85rem 5rem; }
+  .header { flex-direction: column; gap: 8px; }
+  .header-actions { width: 100%; justify-content: flex-end; }
+  .metrics { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .metric-value { font-size: 22px; }
+  .input-row { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+  .input-group input, .input-group select, .input-group textarea, .product-search { font-size: 16px; min-height: 46px; }
+  .btn { min-height: 44px; }
+  .btn-primary { min-height: 48px; font-size: 15px; }
+  .quick-guests .btn { flex: 1; min-width: 0; padding: 0 8px; }
+  .tab { padding: 8px 14px; font-size: 12px; }
+  .period-tabs { flex-wrap: wrap; }
+  .login-box { padding: 1.5rem 1.25rem; }
+  .emoji-grid { grid-template-columns: repeat(6, 1fr); }
+  .lb-row { padding: 10px 12px; gap: 8px; }
+  .lb-total { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── Login Screen ──────────────────────────────────────── -->
+<div id="loginScreen" class="login-wrap">
+  <div class="login-box">
+
+    <!-- Profile selection -->
+    <div id="viewProfiles">
+      <div class="login-logo">🏝️</div>
+      <h2 class="login-title">Shift Tracker</h2>
+      <p class="login-sub">Select your profile to get started</p>
+      <div id="profileGrid" class="profile-grid">
+        <div class="empty-state" style="grid-column:1/-1;border-style:solid;font-size:13px;padding:1.5rem">Loading…</div>
+      </div>
+      <hr class="divider">
+      <button class="btn btn-primary" onclick="showView('create')" style="width:100%">
+        <i class="ti ti-user-plus" style="margin-right:6px"></i>Create new profile
+      </button>
+      <p class="login-error" id="loginError"></p>
+    </div>
+
+    <!-- Create profile form -->
+    <div id="viewCreate" style="display:none">
+      <button class="back-link" onclick="showView('profiles')"><i class="ti ti-arrow-left"></i> Back to profiles</button>
+      <h2 class="login-title">Create profile</h2>
+      <p class="login-sub">Set up your account once and your stats are yours forever</p>
+
+      <div class="input-group">
+        <label>Your name</label>
+        <input type="text" id="newName" placeholder="e.g. Roger" maxlength="24" autocomplete="off">
+      </div>
+
+      <div class="input-group">
+        <label>Choose an icon</label>
+        <div class="emoji-grid" id="emojiGrid"></div>
+      </div>
+
+      <div class="input-group">
+        <label>Choose a color</label>
+        <div class="color-row" id="colorGrid"></div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group" style="margin-bottom:0">
+          <label>PIN (4 digits)</label>
+          <input type="password" id="newPin" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password">
+        </div>
+        <div class="input-group" style="margin-bottom:0">
+          <label>Confirm PIN</label>
+          <input type="password" id="newPinConfirm" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="new-password">
+        </div>
+      </div>
+      <p class="login-error" id="createError"></p>
+      <button class="btn btn-primary" onclick="createProfile()" style="width:100%;margin-top:12px">
+        Create profile
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── PIN Modal ─────────────────────────────────────────── -->
+<div id="pinModal" class="modal-overlay" style="display:none">
+  <div class="pin-box">
+    <div class="pin-user-emoji" id="pinEmoji">😎</div>
+    <div class="pin-user-name" id="pinName">Enter PIN</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+    <div class="numpad">
+      <button class="numpad-btn" onclick="pinKey('1')">1</button>
+      <button class="numpad-btn" onclick="pinKey('2')">2</button>
+      <button class="numpad-btn" onclick="pinKey('3')">3</button>
+      <button class="numpad-btn" onclick="pinKey('4')">4</button>
+      <button class="numpad-btn" onclick="pinKey('5')">5</button>
+      <button class="numpad-btn" onclick="pinKey('6')">6</button>
+      <button class="numpad-btn" onclick="pinKey('7')">7</button>
+      <button class="numpad-btn" onclick="pinKey('8')">8</button>
+      <button class="numpad-btn" onclick="pinKey('9')">9</button>
+      <button class="numpad-btn cancel" onclick="cancelPin()">Cancel</button>
+      <button class="numpad-btn" onclick="pinKey('0')">0</button>
+      <button class="numpad-btn" onclick="pinBackspace()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Main App ──────────────────────────────────────────── -->
+<div class="app" id="mainApp" style="display:none">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>
+        <button class="user-chip" onclick="switchUser()" title="Switch user">
+          <span class="user-chip-emoji" id="headerEmoji">😎</span>
+          <span id="headerName">User</span>
+        </button>
+        <span id="adminBadge" class="admin-badge" style="display:none">ADMIN</span>
+        Shift Tracker
+      </h1>
+      <div class="shift-meta">
+        <span class="stat-chip"><i class="ti ti-calendar"></i> <span id="shiftDate"></span></span>
+        <span style="color:var(--text3)">·</span>
+        <span class="stat-chip"><i class="ti ti-clock"></i> <span id="shiftTimer">00:00:00</span></span>
+        <div class="sync-chip">
+          <span class="sync-dot" id="syncDot"></span>
+          <span id="syncLabel">Connecting…</span>
+        </div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="badge badge-open" id="shiftBadge">● Open</span>
+      <button class="btn btn-danger" id="endShiftBtn" onclick="endShift()">End shift</button>
+      <button class="btn" onclick="resetAll()">New shift</button>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric-card mc-blue">
+      <div class="metric-label">Total sales</div>
+      <div class="metric-value" id="totalSales">$0</div>
+      <div class="metric-sub" id="salesSub">0 transactions</div>
+      <div class="metric-sub" id="totalCommission" style="color:var(--green-mid);margin-top:2px"></div>
+    </div>
+    <div class="metric-card mc-green">
+      <div class="metric-label">vs. goal</div>
+      <div class="metric-value" id="goalPct">—</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="goalBar" style="width:0%"></div></div>
+      <div class="metric-sub" id="goalSub">Set goal in Setup</div>
+    </div>
+    <div class="metric-card mc-purp">
+      <div class="metric-label">Guests</div>
+      <div class="metric-value" id="totalGuests">0</div>
+      <div class="metric-sub" id="convRate">Conversion: —</div>
+    </div>
+    <div class="metric-card mc-amber">
+      <div class="metric-label">Avg. sale</div>
+      <div class="metric-value" id="avgSale">$0</div>
+      <div class="metric-sub" id="bestSale">Best: $0</div>
+    </div>
+    <div class="metric-card mc-teal">
+      <div class="metric-label">Occupancy</div>
+      <div class="metric-value" id="occDisplay">—</div>
+      <div class="metric-sub" id="occTypeDisplay">Set in Setup</div>
+    </div>
+  </div>
+
+  <div class="tabs-wrap">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('log',this)">Log a sale</button>
+      <button class="tab" onclick="switchTab('guests',this)">Guests</button>
+      <button class="tab" onclick="switchTab('history',this)">This shift</button>
+      <button class="tab" onclick="switchTab('past',this)">Past shifts</button>
+      <button class="tab" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
+      <button class="tab" onclick="switchTab('setup',this)">Setup</button>
+    </div>
+  </div>
+
+  <!-- LOG SALE -->
+  <div class="tab-panel active" id="tab-log">
+    <div class="card" id="catCard">
+      <div class="section-title">Step 1 — Select category</div>
+      <div class="cat-pills" id="catPills"></div>
+    </div>
+    <div class="card" id="prodListCard" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div class="section-title" style="margin:0;flex:1" id="catCardTitle">Products</div>
+        <button class="btn btn-sm" onclick="clearCategorySelection()"><i class="ti ti-arrow-left" style="margin-right:4px"></i>Back</button>
+      </div>
+      <input type="text" class="product-search" id="productSearch" placeholder="Search products…" oninput="filterProducts()">
+      <div class="prod-list" id="prodList"></div>
+    </div>
+    <div class="card" id="priceEntryCard" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="flex:1">
+          <div class="sel-prod-cat" id="selProdCat"></div>
+          <div class="sel-prod-name" id="selProdName"></div>
+        </div>
+        <button class="btn btn-sm" onclick="clearProductSelection()"><i class="ti ti-arrow-left" style="margin-right:4px"></i>Back</button>
+      </div>
+      <div class="input-row">
+        <div class="input-group" style="margin-bottom:0">
+          <label>Sale amount ($)</label>
+          <input type="number" id="saleAmount" placeholder="0.00" min="0" step="0.01" inputmode="decimal" oninput="updateSalePreview()">
+        </div>
+        <div class="input-group" style="margin-bottom:0">
+          <label>Guests in group</label>
+          <input type="number" id="saleGuests" placeholder="1" min="1" value="1" inputmode="numeric">
+        </div>
+      </div>
+      <div class="commission-preview" id="salePreview" style="display:none">
+        <div class="cp-item">
+          <span class="cp-label">Pre-tax</span>
+          <span class="cp-value" id="previewPreTax">—</span>
+        </div>
+        <div class="cp-item">
+          <span class="cp-label">Tax</span>
+          <span class="cp-value tax" id="previewTax">—</span>
+        </div>
+        <div class="cp-item">
+          <span class="cp-label">Commission</span>
+          <span class="cp-value comm" id="previewComm">—</span>
+        </div>
+        <div class="cp-item" style="margin-left:auto;text-align:right">
+          <span class="cp-label">Rate</span>
+          <span class="cp-value" id="previewRate" style="color:var(--text2)">—</span>
+        </div>
+      </div>
+      <div class="input-group" style="margin-top:10px">
+        <label>Note (optional)</label>
+        <input type="text" id="saleNote" placeholder="e.g. honeymoon couple, asked about dining…">
+      </div>
+      <button class="btn btn-primary" onclick="logSale()" style="width:100%;margin-top:6px">
+        <i class="ti ti-plus" style="margin-right:5px"></i>Log sale
+      </button>
+    </div>
+  </div>
+
+  <!-- GUESTS -->
+  <div class="tab-panel" id="tab-guests">
+    <div class="card">
+      <div class="section-title">Log guest interactions</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:1rem">Track guests you spoke to who didn't buy — keeps your conversion rate accurate.</p>
+      <div class="quick-guests">
+        <button class="btn" onclick="addGuests(1)">+1 guest</button>
+        <button class="btn" onclick="addGuests(2)">+2 guests</button>
+        <button class="btn" onclick="addGuests(3)">+3 guests</button>
+        <button class="btn" onclick="addGuests(5)">+5 guests</button>
+        <button class="btn" onclick="promptCustomGuests()">Custom…</button>
+      </div>
+      <div class="two-col">
+        <div class="metric-card mc-purp">
+          <div class="metric-label">Total guests</div>
+          <div class="metric-value" id="guestTotal2">0</div>
+        </div>
+        <div class="metric-card mc-blue">
+          <div class="metric-label">Guests who bought</div>
+          <div class="metric-value" id="guestSold2">0</div>
+        </div>
+      </div>
+      <div class="metric-card mc-green" style="margin-top:10px">
+        <div class="metric-label">Conversion rate</div>
+        <div class="metric-value" id="convRate2">—</div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="convBar" style="width:0%;background:var(--green-mid)"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- THIS SHIFT -->
+  <div class="tab-panel" id="tab-history">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-title" style="margin:0">Sale log</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:var(--text2)" id="histCount">0 sales</span>
+          <button class="btn btn-sm" onclick="exportCSV()">Export CSV</button>
+        </div>
+      </div>
+      <div class="sale-list" id="saleList"><div class="empty-state">No sales logged yet</div></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Sales by product</div>
+      <div class="legend" id="prodLegend"></div>
+      <div class="chart-wrap"><canvas id="prodChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Sales over time</div>
+      <div class="chart-wrap" style="height:160px"><canvas id="timeChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- PAST SHIFTS -->
+  <div class="tab-panel" id="tab-past">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="section-title" style="margin:0">Completed shifts</div>
+        <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear all</button>
+      </div>
+      <div id="pastShiftsList"><div class="empty-state">No completed shifts yet</div></div>
+    </div>
+    <div class="card" id="pastStatsCard" style="display:none">
+      <div class="section-title">Your all-time stats</div>
+      <div class="past-stats-grid">
+        <div class="past-stat"><div class="past-stat-val" id="pastStatShifts">0</div><div class="past-stat-lbl">Shifts</div></div>
+        <div class="past-stat"><div class="past-stat-val" id="pastStatTotal">$0</div><div class="past-stat-lbl">Total earned</div></div>
+        <div class="past-stat"><div class="past-stat-val" id="pastStatAvg">$0</div><div class="past-stat-lbl">Avg per shift</div></div>
+        <div class="past-stat"><div class="past-stat-val" id="pastStatBest">$0</div><div class="past-stat-lbl">Best shift</div></div>
+        <div class="past-stat"><div class="past-stat-val" id="pastStatTx">0</div><div class="past-stat-lbl">Total sales</div></div>
+        <div class="past-stat"><div class="past-stat-val" id="pastStatGuests">0</div><div class="past-stat-lbl">Total guests</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="tab-panel" id="tab-leaderboard">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin:0">Team leaderboard</div>
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setLbPeriod('alltime',this)">All time</button>
+          <button class="period-tab" onclick="setLbPeriod('week',this)">This week</button>
+          <button class="period-tab" onclick="setLbPeriod('today',this)">Today</button>
+        </div>
+      </div>
+      <div id="leaderboardList" class="lb-list">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETUP -->
+  <div class="tab-panel" id="tab-setup">
+    <div class="card">
+      <div class="section-title">Shift goal & occupancy</div>
+      <div class="input-row">
+        <div class="input-group" style="margin-bottom:0">
+          <label>Sales goal ($)</label>
+          <input type="number" id="goalInput" placeholder="e.g. 2000" min="0" inputmode="decimal" oninput="updateGoal()">
+        </div>
+        <div class="input-group" style="margin-bottom:0">
+          <label>Occupancy (%)</label>
+          <input type="number" id="occInput" placeholder="e.g. 80" min="0" max="100" inputmode="decimal" oninput="updateOcc()">
+        </div>
+      </div>
+      <div class="input-group" style="margin-top:10px">
+        <label>Occupancy type</label>
+        <select id="occTypeSelect" onchange="updateOcc()">
+          <option value="Hotel">Hotel</option>
+          <option value="Resort">Resort</option>
+          <option value="Cruise ship">Cruise ship</option>
+          <option value="Timeshare">Timeshare</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Commission & tax</div>
+      <div class="input-row">
+        <div class="input-group" style="margin-bottom:0">
+          <label>Hotel tier</label>
+          <select id="hotelTierSelect" onchange="updateHotelTier()">
+            <option value="Premier">Premier (PB, HR, RP, AV, SN, TL, HG)</option>
+            <option value="Non-Premier">Non-Premier (CB, SF, ES)</option>
+            <option value="UPH">UPH (Partner hotels)</option>
+          </select>
+        </div>
+        <div class="input-group" style="margin-bottom:0">
+          <label>Tax rate (%)</label>
+          <input type="number" id="taxRateInput" placeholder="6.5" min="0" max="20" step="0.1" inputmode="decimal" oninput="updateTaxSettings()">
+        </div>
+      </div>
+      <div class="input-group" style="margin-top:8px;flex-direction:row;align-items:center;gap:10px;margin-bottom:0">
+        <input type="checkbox" id="priceIncludesTaxCheck" onchange="updateTaxSettings()" style="width:auto;min-height:auto;accent-color:var(--blue-mid)">
+        <label for="priceIncludesTaxCheck" style="font-size:13px;font-weight:500;color:var(--text);cursor:pointer">Price I enter already includes tax</label>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">FL Orange County sales tax is 6.5%. Commission is computed on the pre-tax price.</div>
+    </div>
+    <div class="card">
+      <div class="section-title">Shift notes</div>
+      <div class="input-group" style="margin-bottom:0">
+        <textarea id="shiftNotes" placeholder="Weather, special events, team goals, anything relevant…" oninput="state.notes=this.value;scheduleSave()"></textarea>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Account</div>
+      <button class="btn btn-danger" onclick="switchUser()">
+        <i class="ti ti-logout" style="margin-right:6px"></i>Switch user / log out
+      </button>
+    </div>
+    <div class="card" id="claimAdminCard">
+      <div class="section-title">Become admin</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Enter the admin secret to unlock user management.</p>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="adminSecretInput" placeholder="Admin secret…" style="flex:1;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;min-height:40px;outline:none" onkeydown="if(event.key==='Enter')claimAdmin()">
+        <button class="btn btn-primary" onclick="claimAdmin()">Claim</button>
+      </div>
+      <div id="claimAdminError" style="font-size:12px;color:var(--red-mid);margin-top:6px;min-height:16px"></div>
+    </div>
+    <div class="card" id="adminPanelCard" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="section-title" style="margin:0">Admin panel</div>
+        <button class="btn btn-sm" onclick="loadAdminPanel()"><i class="ti ti-refresh" style="margin-right:4px"></i>Refresh</button>
+      </div>
+      <div id="adminUserList"><div style="color:var(--text3);font-size:13px">Loading…</div></div>
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<script>
+// ─── Constants ──────────────────────────────────────────────
+const PRODUCT_CATEGORIES = [
+  { name: 'Epic Universe', color: '#7C3AED', icon: 'ti-planet', products: [
+    'Epic Universe 1D AD', 'Epic Universe 1D CH', '1D EPIC AP AD'
+  ]},
+  { name: 'USF / IOA', color: '#2563EB', icon: 'ti-building-castle', products: [
+    'USF/IOA 1D Base AD', 'USF/IOA 1D Base CH', 'USF/IOA 1D PTP AD', 'USF/IOA 1D PTP CH',
+    '1D USF/IOA BASE CONV <2PM AD', '1D USF/IOA BASE CONV <4PM AD',
+    '1D USF/IOA PTP CONV <2PM AD', '1D USF/IOA PTP CONV <4PM AD'
+  ]},
+  { name: '+Epic Combos', color: '#0D9488', icon: 'ti-layers-union', products: [
+    '1D USF/IOA BASE + 1D EPIC AD', '1D USF/IOA BASE + 1D EPIC CH',
+    '1D USF/IOA PTP + 1D EPIC AD', '1D USF/IOA PTP + 1D EPIC CH',
+    '2 park 1D PTP + 1 DAY AD', '2 park 1D PTP + 1 DAY CH'
+  ]},
+  { name: 'Multi-Day', color: '#16A34A', icon: 'ti-calendar-stats', products: [
+    '3D BASE USF/IOA/EPIC AD', '3D BASE USF/IOA/EPIC CH',
+    '3D PTP USF/IOA/EPIC AD', '3D PTP USF/IOA/EPIC CH',
+    '4D PTP USF/IOA/EPIC AD', '4D PTP USF/IOA/EPIC CH',
+    '5D PTP USF/IOA/EPIC AD', '5D PTP USF/IOA/EPIC CH',
+    '6D PTP USF/IOA/EPIC AD', '6D PTP USF/IOA/EPIC CH',
+    '7D PTP USF/IOA/EPIC AD', '7D PTP USF/IOA/EPIC CH',
+    '3D BASE + 2 DAY FREE AD', '3D BASE + 2 DAY FREE CH',
+    '3D PTP + 2 DAY FREE AD', '3D PTP + 2 DAY FREE CH',
+    '3D BASE + 2 DAY FREE + VB AD', '3D BASE + 2 DAY FREE + VB CH'
+  ]},
+  { name: 'FL Resident', color: '#EA580C', icon: 'ti-sun', products: [
+    'FL USF/IOA 1D BASE AD', 'FL USF/IOA 1D BASE CH',
+    'FL USF/IOA 1D PTP AD', 'FL USF/IOA 1D PTP CH',
+    'FL USF/IOA 2D BASE AD', 'FL USF/IOA 2D BASE CH',
+    'FL USF/IOA 2D PTP AD', 'FL USF/IOA 2D PTP CH',
+    'FL 1D USF/IOA BASE + 1D EPIC AD', 'FL 1D USF/IOA BASE + 1D EPIC CH',
+    'FL 1D USF/IOA PTP + 1D EPIC AD', 'FL 1D USF/IOA PTP + 1D EPIC CH'
+  ]},
+  { name: 'Annual Passes', color: '#D97706', icon: 'ti-ticket', products: [
+    '2PK 12M SEASONAL FL AD', '2PK 12M SEASONAL FL CH',
+    '2PK 12M SEASONAL AD', '2PK 12M SEASONAL CH',
+    '2PK 12M POWER FL AD', '2PK 12M POWER FL CH',
+    '2PK 12M POWER AD', '2PK 12M POWER CH',
+    '2PK 12M PREFERRED FL AD', '2PK 12M PREFERRED FL CH',
+    '2PK 12M PREFERRED AD', '2PK 12M PREFERRED CH',
+    '2PK 12M PREMIER FL AD', '2PK 12M PREMIER FL CH',
+    '2PK 12M PREMIER AD', '2PK 12M PREMIER CH'
+  ]},
+  { name: 'Express', color: '#DC2626', icon: 'ti-bolt', products: [
+    'USF EXPRESS', 'IOA EXPRESS', 'USF/IOA EXPRESS',
+    'USF EXPRESS UNLIMITED', 'IOA EXPRESS UNLIMITED', 'USF/IOA UNLIMITED EXPRESS',
+    '2D USF/IOA UNLIMITED EXPRESS', 'USF EXPRESS >4PM', 'IOA EXPRESS >4PM',
+    'VB EXPRESS', 'VB EXPRESS PLUS', 'EPIC EXPRESS',
+    '2D USF/IOA/EPIC EXPRESS', '3D USF/IOA/EPIC EXPRESS',
+    '4D USF/IOA/EPIC EXPRESS', '5D USF/IOA/EPIC EXPRESS'
+  ]},
+  { name: 'VIP Tours', color: '#9333EA', icon: 'ti-crown', products: [
+    'VIP TOUR: NON-PRIVATE USF', 'VIP TOUR: NON-PRIVATE IOA',
+    'VIP TOUR: PRIVATE USF', 'VIP TOUR: PRIVATE IOA',
+    'VIP TOUR: NON-PRIVATE PTP', 'VIP TOUR: PRIVATE PTP',
+    'VIP TOUR: PRIVATE PTP 2D',
+    'VIP TOUR: NON-PRIVATE EPIC', 'VIP TOUR: PRIVATE EPIC'
+  ]},
+  { name: 'Volcano Bay', color: '#0284C7', icon: 'ti-waves', products: [
+    '1D VB AD', '1D VB CH', '1D VB AD FL', '1D VB CH FL'
+  ]},
+  { name: 'Dining', color: '#BE185D', icon: 'ti-tools-kitchen-2', products: [
+    'LEAKY CAULDRON BREAKFAST AD', 'LEAKY CAULDRON BREAKFAST CH',
+    'THREE BROOMSTICKS BREAKFAST AD', 'THREE BROOMSTICKS BREAKFAST CH',
+    'MARVEL CHARACTER DINING AD', 'MARVEL CHARACTER DINING CH',
+    '1D FREESTYLE CUP', '2D FREESTYLE CUP', '3D FREESTYLE CUP',
+    '4D FREESTYLE CUP', '5D FREESTYLE CUP'
+  ]},
+  { name: 'Add-Ons', color: '#6B7280', icon: 'ti-puzzle', products: [
+    '1D MY UNIVERSAL PHOTOS', '3D MY UNIVERSAL PHOTOS', '5D MY UNIVERSAL PHOTOS',
+    'CABANA - SINGLE', 'CABANA - LOWER', 'CABANA - UPPER',
+    'CABANA - KIDS AREA', 'CABANA - FAMILY', 'PREMIUM SEATING',
+    'LANYARD AND POUCH COMBO', 'POTTER LANYARD AND POUCH COMBO',
+    'EVENT LANYARD', 'POUCH ONLY'
+  ]},
+  { name: 'Other', color: '#475569', icon: 'ti-dots-circle-horizontal', products: [
+    '1D I-RIDE', '3D I-RIDE', '5D I-RIDE', '7D I-RIDE', '14D I-RIDE',
+    'One-Way AD Superstar Shuttle', 'One-Way CH Superstar Shuttle',
+    'SeaWorld 1D', 'HHN 1D',
+    'HHN EXPRESS STANDARD', 'HHN AFTER 11 EXPRESS',
+    'HHN UNLIMITED EXPRESS', 'HHN FREQUENT FEAR PASS',
+    'HHN RIP TOUR', 'HHN PREMIUM SCREAM NIGHT',
+    'PRE-PAID REGULAR PARKING', 'DARKMOOR THE EXPERIMENT'
+  ]}
+];
+const CHART_COLORS  = ['#2563EB','#16A34A','#7C3AED','#D97706','#0D9488','#DC2626','#0284C7','#9333EA'];
+const EMOJIS        = ['😎','🏄','🎯','💪','⭐','🌟','🔥','💼','🎪','🏆','💎','🚀','👑','✨','🎭','🌊'];
+const COLORS        = ['#2563EB','#16A34A','#7C3AED','#EA580C','#DC2626','#DB2777','#0D9488','#D97706'];
+
+// ─── Commission rates by tier (decimals) ─────────────────────
+const COMM_RATES = {
+  admission:     { Premier: 0.005,  'Non-Premier': 0.0045, UPH: 0.0055 },
+  express:       { Premier: 0.015,  'Non-Premier': 0.01,   UPH: 0.015  },
+  upgrades:      { Premier: 0.0125, 'Non-Premier': 0.01,   UPH: 0.0225 },
+  vipPrivate:    { Premier: 0.025,  'Non-Premier': 0.025,  UPH: 0.025  },
+  vipNonPrivate: { Premier: 0.025,  'Non-Premier': 0.02,   UPH: 0.025  },
+  lanyards:      { Premier: 0.03,   'Non-Premier': 0.03,   UPH: 0.03   },
+  ancillary:     { Premier: 0.0125, 'Non-Premier': 0.0125, UPH: 0.0175 },
+  thirdParty:    { Premier: 0.01,   'Non-Premier': 0.01,   UPH: 0.01   },
+  none:          { Premier: 0,      'Non-Premier': 0,       UPH: 0      },
+};
+
+function commTypeFor(product, tier) {
+  if (product.includes('VIP TOUR: PRIVATE'))     return 'vipPrivate';
+  if (product.includes('VIP TOUR: NON-PRIVATE')) return 'vipNonPrivate';
+  if (product.includes('EXPRESS'))               return 'express';
+  if (product.includes('LANYARD') || product === 'POUCH ONLY' || product === 'EVENT LANYARD') return 'lanyards';
+  if (product.includes('CONV'))                  return 'upgrades';
+  if (product === 'SeaWorld 1D' || product.includes('I-RIDE')) return 'thirdParty';
+  if (product.includes('PARKING') || product.includes('Superstar Shuttle')) return 'none';
+  if (product.includes('PHOTOS') || product.includes('CABANA') ||
+      product.includes('PREMIUM SEATING') || product.includes('FREESTYLE') ||
+      product.includes('DARKMOOR') || product.includes('BREAKFAST') ||
+      product.includes('CHARACTER DINING') || product.includes('HHN')) return 'ancillary';
+  // 1D PTP: on-site hotels pay $0 commission; only UPH gets the admission rate
+  const is1dPtp = product === 'USF/IOA 1D PTP AD' || product === 'USF/IOA 1D PTP CH' ||
+                  product === 'FL USF/IOA 1D PTP AD' || product === 'FL USF/IOA 1D PTP CH';
+  if (is1dPtp && tier !== 'UPH') return 'none';
+  return 'admission';
+}
+function commRateFor(product, tier) {
+  return COMM_RATES[commTypeFor(product, tier)]?.[tier] ?? 0;
+}
+function calcCommission(product, amount, tier) {
+  return Math.round(amount * commRateFor(product, tier) * 100) / 100;
+}
+
+// ─── Session / Auth ─────────────────────────────────────────
+let currentUser = null;
+let authToken   = null;
+let saveTimer   = null;
+
+function getSession() { try { return JSON.parse(localStorage.getItem('shiftSession') || 'null'); } catch { return null; } }
+function setSession(token, user) { localStorage.setItem('shiftSession', JSON.stringify({ token, user })); currentUser = user; authToken = token; }
+function clearSession() { localStorage.removeItem('shiftSession'); currentUser = null; authToken = null; }
+
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (authToken) h['Authorization'] = 'Bearer ' + authToken;
+  return h;
+}
+
+// ─── API helpers ─────────────────────────────────────────────
+let serverOk = false;
+
+async function apiFetch(method, path, body) {
+  const opts = { method, headers: authHeaders(), signal: AbortSignal.timeout(5000) };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  if (res.status === 401) { serverOk = false; setSyncUI('offline', 'Session expired'); return null; }
+  if (!res.ok) throw new Error(res.status);
+  return res.json();
+}
+const apiGet    = p       => apiFetch('GET',    p);
+const apiPut    = (p, b)  => apiFetch('PUT',    p, b);
+const apiPost   = (p, b)  => apiFetch('POST',   p, b);
+const apiDelete = p       => apiFetch('DELETE', p);
+
+function setSyncUI(status, label) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  dot.className = 'sync-dot ' + status;
+  lbl.textContent = label;
+}
+
+// ─── Per-user localStorage keys ──────────────────────────────
+const lsStateKey   = () => 'shiftState_'   + (currentUser?.id || 'anon');
+const lsHistoryKey = () => 'shiftHistory_' + (currentUser?.id || 'anon');
+function lsGet(key, fb) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fb; } catch { return fb; } }
+function lsSet(key, v)  { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }
+
+// ─── Shift state ─────────────────────────────────────────────
+let state = {
+  sales: [], guestsExtra: 0, goal: 0, occ: null, occType: 'Hotel',
+  hotelTier: 'Premier', taxRate: 6.5, priceIncludesTax: true,
+  selectedProduct: null, shiftStart: Date.now(), shiftOpen: true, notes: '', updatedAt: 0
+};
+let prodChart = null, timeChart = null;
+let historyCache = null;
+
+function scheduleSave() {
+  lsSet(lsStateKey(), state);
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(pushState, 900);
+}
+async function pushState() {
+  if (!serverOk) return;
+  setSyncUI('saving', 'Saving…');
+  try { await apiPut('/api/me/state', state); setSyncUI('live', 'Synced'); }
+  catch { setSyncUI('offline', 'Offline'); }
+}
+
+// ─── History ─────────────────────────────────────────────────
+async function getHistory() {
+  if (historyCache !== null) return historyCache;
+  if (serverOk) {
+    try {
+      historyCache = await apiGet('/api/me/history');
+      lsSet(lsHistoryKey(), historyCache);
+      return historyCache;
+    } catch {}
+  }
+  historyCache = lsGet(lsHistoryKey(), []);
+  return historyCache;
+}
+async function addToHistory(entry) {
+  if (!historyCache) historyCache = lsGet(lsHistoryKey(), []);
+  if (serverOk) {
+    try { const { id } = await apiPost('/api/me/history', entry); entry.id = id; } catch {}
+  }
+  historyCache.unshift(entry);
+  lsSet(lsHistoryKey(), historyCache);
+}
+async function removeFromHistory(serverId, idx) {
+  if (serverId && serverOk) { try { await apiDelete('/api/me/history/' + serverId); } catch {} }
+  if (historyCache) {
+    historyCache = serverId
+      ? historyCache.filter(h => h.id !== serverId)
+      : (historyCache.splice(idx, 1), historyCache);
+    lsSet(lsHistoryKey(), historyCache);
+  }
+}
+
+// ─── Formatting ──────────────────────────────────────────────
+const fmt    = n => '$' + Math.round(n).toLocaleString();
+const fmtD   = n => '$' + (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const nowStr = () => new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+const fmtDur = ms => { const m=Math.floor(ms/60000); return m<60?m+'m':Math.floor(m/60)+'h '+String(m%60).padStart(2,'0')+'m'; };
+const catFor = p => PRODUCT_CATEGORIES.find(c => c.products.includes(p));
+
+// ─── Login screen ────────────────────────────────────────────
+let selectedEmoji = EMOJIS[0];
+let selectedColor = COLORS[0];
+
+function showView(v) {
+  document.getElementById('viewProfiles').style.display = v === 'profiles' ? '' : 'none';
+  document.getElementById('viewCreate').style.display   = v === 'create'   ? '' : 'none';
+  if (v === 'create') buildCreateForm();
+}
+
+async function loadProfiles() {
+  const grid = document.getElementById('profileGrid');
+  let users = [];
+  try {
+    users = await apiGet('/api/users') || [];
+    serverOk = true;
+    lsSet('cachedUsers', users);
+  } catch {
+    serverOk = false;
+    users = lsGet('cachedUsers', []);
+  }
+  if (!users.length) {
+    grid.innerHTML = '<p style="grid-column:1/-1;font-size:13px;color:var(--text2);text-align:center">No profiles yet — create the first one!</p>';
+    return;
+  }
+  grid.innerHTML = users.map(u => `
+    <button class="profile-card" onclick="startLogin(${JSON.stringify(JSON.stringify(u))})">
+      <div class="profile-avatar" style="background:${u.color}22">${u.emoji}</div>
+      <div class="profile-name">${u.name}</div>
+    </button>`).join('');
+}
+
+async function startLogin(userJson) {
+  const user = JSON.parse(userJson);
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('pinEmoji').textContent = user.emoji;
+  document.getElementById('pinName').textContent  = user.name;
+  try {
+    const { token, user: freshUser } = await openPinModal(user.id);
+    setSession(token, freshUser);
+    await enterApp();
+  } catch(e) {
+    if (e?.message !== 'cancelled') {
+      document.getElementById('loginError').textContent = e?.message || 'Login failed';
+    }
+  }
+}
+
+function buildCreateForm() {
+  selectedEmoji = EMOJIS[0];
+  selectedColor = COLORS[0];
+
+  const eg = document.getElementById('emojiGrid');
+  eg.innerHTML = EMOJIS.map(e =>
+    `<button class="emoji-btn${e===selectedEmoji?' sel':''}" onclick="pickEmoji('${e}',this)">${e}</button>`
+  ).join('');
+
+  const cg = document.getElementById('colorGrid');
+  cg.innerHTML = COLORS.map(c =>
+    `<button class="color-btn${c===selectedColor?' sel':''}" style="background:${c}" onclick="pickColor('${c}',this)" title="${c}"></button>`
+  ).join('');
+
+  document.getElementById('newName').value = '';
+  document.getElementById('newPin').value = '';
+  document.getElementById('newPinConfirm').value = '';
+  document.getElementById('createError').textContent = '';
+}
+
+function pickEmoji(e, btn) {
+  selectedEmoji = e;
+  document.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+function pickColor(c, btn) {
+  selectedColor = c;
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+
+async function createProfile() {
+  const name = document.getElementById('newName').value.trim();
+  const pin  = document.getElementById('newPin').value;
+  const pin2 = document.getElementById('newPinConfirm').value;
+  const err  = document.getElementById('createError');
+
+  if (!name)          { err.textContent = 'Enter a name.'; return; }
+  if (pin.length < 4) { err.textContent = 'PIN must be 4 digits.'; return; }
+  if (!/^\d{4}$/.test(pin)) { err.textContent = 'PIN must be 4 digits (numbers only).'; return; }
+  if (pin !== pin2)   { err.textContent = 'PINs don\'t match.'; return; }
+
+  try {
+    const data = await apiPost('/api/users', { name, color: selectedColor, emoji: selectedEmoji, pin });
+    if (!data) { err.textContent = 'Could not reach server.'; return; }
+    serverOk = true;
+    setSession(data.token, data.user);
+    await enterApp();
+  } catch(e) {
+    err.textContent = e.message === '409' ? 'That name is already taken.' : 'Server error — is the server running?';
+  }
+}
+
+// ─── PIN Modal ───────────────────────────────────────────────
+let pinBuf = '';
+let pinResolve = null, pinReject = null, pinUserId = null;
+
+function openPinModal(userId) {
+  return new Promise((resolve, reject) => {
+    pinBuf = ''; pinUserId = userId; pinResolve = resolve; pinReject = reject;
+    document.getElementById('pinError').textContent = '';
+    updatePinDots();
+    document.getElementById('pinModal').style.display = 'flex';
+    document.addEventListener('keydown', onPinKeydown);
+  });
+}
+function closePinModal() {
+  document.getElementById('pinModal').style.display = 'none';
+  document.removeEventListener('keydown', onPinKeydown);
+  pinBuf = ''; pinUserId = pinResolve = pinReject = null;
+}
+function onPinKeydown(e) {
+  if (e.key >= '0' && e.key <= '9') pinKey(e.key);
+  else if (e.key === 'Backspace') pinBackspace();
+  else if (e.key === 'Escape') cancelPin();
+}
+function pinKey(d) {
+  if (pinBuf.length >= 4) return;
+  pinBuf += d;
+  updatePinDots();
+  if (pinBuf.length === 4) setTimeout(submitPin, 150);
+}
+function pinBackspace() { pinBuf = pinBuf.slice(0,-1); updatePinDots(); }
+function cancelPin() {
+  closePinModal();
+  if (pinReject) pinReject(new Error('cancelled'));
+}
+function updatePinDots() {
+  document.querySelectorAll('.pin-dot').forEach((d,i) => {
+    d.className = 'pin-dot' + (i < pinBuf.length ? ' filled' : '');
+  });
+}
+async function submitPin() {
+  if (!pinResolve || pinBuf.length !== 4) return;
+  try {
+    const data = await apiPost('/api/login', { userId: pinUserId, pin: pinBuf });
+    if (data) { closePinModal(); serverOk = true; pinResolve(data); }
+    else { showPinError('Wrong PIN — try again.'); }
+  } catch(e) {
+    if (e.message === '401') showPinError('Wrong PIN — try again.');
+    else showPinError('Server unreachable.');
+  }
+}
+function showPinError(msg) {
+  pinBuf = '';
+  document.getElementById('pinError').textContent = msg;
+  document.querySelectorAll('.pin-dot').forEach(d => { d.className = 'pin-dot error'; });
+  setTimeout(() => { document.querySelectorAll('.pin-dot').forEach(d => { d.className = 'pin-dot'; }); }, 700);
+}
+
+// ─── App init ────────────────────────────────────────────────
+function showLoginScreen() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display     = 'none';
+  showView('profiles');
+  loadProfiles();
+}
+function showMainApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display     = '';
+  document.getElementById('headerEmoji').textContent   = currentUser.emoji;
+  document.getElementById('headerName').textContent    = currentUser.name;
+  showAdminUI();
+}
+
+async function enterApp() {
+  showMainApp();
+
+  // Load local state immediately for instant render
+  const local = lsGet(lsStateKey(), null);
+  if (local) { state = { ...state, ...local }; syncUIToState(); render(); }
+
+  // Then try server
+  try {
+    const [srv, me] = await Promise.all([apiGet('/api/me/state'), apiGet('/api/me')]);
+    serverOk = true;
+    setSyncUI('live', 'Synced');
+    if (me) { currentUser = me; setSession(authToken, me); showAdminUI(); }
+    if (srv && srv.updatedAt > (local?.updatedAt ?? 0)) {
+      state = { ...state, ...srv };
+      syncUIToState();
+      render();
+    }
+  } catch {
+    setSyncUI('offline', 'Local only');
+  }
+
+  if (!local) render();
+  renderCategoryPills();
+  updateTimer();
+}
+
+async function switchUser() {
+  if (!confirm('Switch user? Your current shift will be saved.')) return;
+  try { await apiPost('/api/logout'); } catch {}
+  clearSession();
+  historyCache = null;
+  state = { sales:[], guestsExtra:0, goal:0, occ:null, occType:'Hotel', hotelTier:'Premier', taxRate:6.5, priceIncludesTax:true, selectedProduct:null, shiftStart:Date.now(), shiftOpen:true, notes:'', updatedAt:0 };
+  selectedCategory = null;
+  if (prodChart) { prodChart.destroy(); prodChart = null; }
+  if (timeChart) { timeChart.destroy(); timeChart = null; }
+  showLoginScreen();
+}
+
+function syncUIToState() {
+  document.getElementById('goalInput').value          = state.goal || '';
+  document.getElementById('occInput').value           = state.occ != null ? state.occ : '';
+  document.getElementById('occTypeSelect').value      = state.occType || 'Hotel';
+  document.getElementById('shiftNotes').value         = state.notes || '';
+  document.getElementById('hotelTierSelect').value    = state.hotelTier || 'Premier';
+  document.getElementById('taxRateInput').value       = state.taxRate ?? 6.5;
+  document.getElementById('priceIncludesTaxCheck').checked = state.priceIncludesTax !== false;
+  if (!state.shiftOpen) {
+    document.getElementById('shiftBadge').textContent = '● Closed';
+    document.getElementById('shiftBadge').className   = 'badge badge-closed';
+    document.getElementById('endShiftBtn').disabled   = true;
+  } else {
+    document.getElementById('shiftBadge').textContent = '● Open';
+    document.getElementById('shiftBadge').className   = 'badge badge-open';
+    document.getElementById('endShiftBtn').disabled   = false;
+  }
+}
+
+// ─── Render ──────────────────────────────────────────────────
+function render() {
+  const { sales, goal, occ, occType, guestsExtra, hotelTier = 'Premier' } = state;
+  const total       = sales.reduce((a,s)=>a+s.amount, 0);
+  const totalComm   = sales.reduce((a,s)=>a+(s.commission||0), 0);
+  const guestsSold  = sales.reduce((a,s)=>a+s.guests, 0);
+  const totalGuests = guestsSold + guestsExtra;
+  const txCount     = guestsSold; // each guest = 1 ticket sold
+  const saleCount   = sales.length;
+  const avg         = txCount ? total/txCount : 0;
+  const best        = saleCount ? Math.max(...sales.map(s=>s.amount)) : 0;
+  const goalPct     = goal > 0 ? (total/goal)*100 : null;
+  const conv        = totalGuests > 0 ? Math.round((guestsSold/totalGuests)*100) : null;
+
+  document.getElementById('totalSales').textContent  = fmt(total);
+  document.getElementById('salesSub').textContent    = txCount+' ticket'+(txCount!==1?'s':'')+' · '+saleCount+' sale'+(saleCount!==1?'s':'');
+  document.getElementById('totalCommission').textContent = txCount ? 'Commission: '+fmtD(totalComm) : '';
+  if (goalPct !== null) {
+    document.getElementById('goalPct').textContent   = Math.round(goalPct)+'%';
+    document.getElementById('goalBar').style.width   = Math.min(goalPct,100)+'%';
+    document.getElementById('goalBar').style.background = goalPct>=100?'var(--green-mid)':'var(--blue-mid)';
+    document.getElementById('goalSub').textContent   = fmt(total)+' of '+fmt(goal)+' goal';
+  } else {
+    document.getElementById('goalPct').textContent   = '—';
+    document.getElementById('goalSub').textContent   = 'Set goal in Setup';
+  }
+  document.getElementById('totalGuests').textContent  = totalGuests;
+  document.getElementById('convRate').textContent     = conv!==null?'Conversion: '+conv+'%':'Conversion: —';
+  document.getElementById('avgSale').textContent      = fmt(avg);
+  document.getElementById('bestSale').textContent     = 'Best: '+fmt(best);
+  if (occ !== null) {
+    document.getElementById('occDisplay').textContent    = occ+'%';
+    document.getElementById('occTypeDisplay').textContent = occType;
+  } else {
+    document.getElementById('occDisplay').textContent    = '—';
+    document.getElementById('occTypeDisplay').textContent = 'Set in Setup';
+  }
+  document.getElementById('guestTotal2').textContent  = totalGuests;
+  document.getElementById('guestSold2').textContent   = guestsSold;
+  document.getElementById('convRate2').textContent    = conv!==null?conv+'%':'—';
+  document.getElementById('convBar').style.width      = (conv||0)+'%';
+  document.getElementById('histCount').textContent    = txCount+' ticket'+(txCount!==1?'s':'');
+  document.getElementById('shiftDate').textContent    = new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+  renderProductListItems(); renderSaleList(); renderCharts(sales);
+}
+
+let selectedCategory = null;
+
+function renderCategoryPills() {
+  document.getElementById('catPills').innerHTML = PRODUCT_CATEGORIES.map(cat => {
+    const active = selectedCategory && selectedCategory.name === cat.name;
+    return `<button class="cat-pill" style="color:${active?'#fff':cat.color};border-color:${cat.color};background:${active?cat.color:cat.color+'18'}" onclick="selectCategory('${cat.name}')">
+      <i class="ti ${cat.icon}"></i>${cat.name}
+    </button>`;
+  }).join('');
+}
+
+function selectCategory(name) {
+  selectedCategory = PRODUCT_CATEGORIES.find(c => c.name === name);
+  document.getElementById('catCardTitle').textContent = selectedCategory.name;
+  document.getElementById('productSearch').value = '';
+  document.getElementById('prodListCard').style.display = '';
+  document.getElementById('priceEntryCard').style.display = 'none';
+  state.selectedProduct = null;
+  renderCategoryPills();
+  renderProductListItems();
+}
+
+function clearCategorySelection() {
+  selectedCategory = null;
+  state.selectedProduct = null;
+  document.getElementById('prodListCard').style.display = 'none';
+  document.getElementById('priceEntryCard').style.display = 'none';
+  renderCategoryPills();
+}
+
+function renderProductListItems() {
+  if (!selectedCategory) return;
+  const query = (document.getElementById('productSearch')?.value || '').toLowerCase();
+  const list = selectedCategory.products.filter(p => !query || p.toLowerCase().includes(query));
+  document.getElementById('prodList').innerHTML = list.map(p => {
+    const count = state.sales.filter(s => s.product === p).length;
+    return `<div class="prod-list-item" onclick="selectProduct('${p}')">
+      <span>${p}</span>
+      <span class="pli-count${count>0?' has-sales':''}">${count > 0 ? count+' sold' : '+'}</span>
+    </div>`;
+  }).join('') || '<div style="color:var(--text3);font-size:13px;text-align:center;padding:1rem 0">No products match</div>';
+}
+
+function filterProducts() { renderProductListItems(); }
+function renderSaleList() {
+  const el = document.getElementById('saleList');
+  if (!state.sales.length) { el.innerHTML='<div class="empty-state">No sales logged yet</div>'; return; }
+  el.innerHTML = [...state.sales].reverse().map((s,ri) => {
+    const i = state.sales.length-1-ri;
+    return `<div class="sale-item">
+      <span class="sale-time">${s.time}</span>
+      <div class="sale-product">${s.product}${s.note?`<div class="sale-note">${s.note}</div>`:''}</div>
+      <span class="sale-guests">${s.guests}g</span>
+      <span class="sale-amount">${fmtD(s.amount)}</span>
+      ${s.commission!=null?`<span class="sale-commission">+${fmtD(s.commission)}</span>`:''}
+      <button class="trash-btn" onclick="deleteSale(${i})"><i class="ti ti-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+function renderCharts(sales) {
+  const pt = {}; sales.forEach(s=>{ pt[s.product]=(pt[s.product]||0)+s.amount; });
+  const labels = Object.keys(pt); const vals = labels.map(k=>Math.round(pt[k]*100)/100);
+  const colors = CHART_COLORS.slice(0,labels.length);
+  document.getElementById('prodLegend').innerHTML = labels.map((l,i)=>
+    `<span class="legend-item"><span class="legend-swatch" style="background:${colors[i]}"></span>${l} ${fmtD(vals[i])}</span>`).join('');
+  if (prodChart) { prodChart.destroy(); prodChart=null; }
+  if (labels.length) prodChart = new Chart(document.getElementById('prodChart'),{
+    type:'bar', data:{labels,datasets:[{data:vals,backgroundColor:colors,borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{font:{size:11}}},y:{ticks:{font:{size:11},callback:v=>'$'+Math.round(v).toLocaleString()}}}}
+  });
+  const sorted=[...sales].sort((a,b)=>a.ts-b.ts); let r=0;
+  const td=sorted.map(s=>{r+=s.amount;return{x:s.time,y:Math.round(r*100)/100};});
+  if (timeChart) { timeChart.destroy(); timeChart=null; }
+  if (td.length) {
+    const ds=[{label:'Sales',data:td,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,0.08)',fill:true,tension:0.35,pointRadius:4,pointBackgroundColor:'#2563EB'}];
+    if (state.goal>0) ds.push({label:'Goal',data:[{x:td[0].x,y:state.goal},{x:td[td.length-1].x,y:state.goal}],borderColor:'#16A34A',borderDash:[6,4],fill:false,pointRadius:0});
+    timeChart = new Chart(document.getElementById('timeChart'),{
+      type:'line',data:{datasets:ds},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{font:{size:10},maxTicksLimit:8}},y:{ticks:{font:{size:10},callback:v=>'$'+Math.round(v).toLocaleString()}}}}
+    });
+  }
+}
+
+async function renderPastShifts() {
+  const el = document.getElementById('pastShiftsList');
+  const sc = document.getElementById('pastStatsCard');
+  el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
+  const history = await getHistory();
+  if (!history.length) { el.innerHTML='<div class="empty-state">No completed shifts yet.<br>End a shift to save it here.</div>'; sc.style.display='none'; return; }
+  sc.style.display='';
+  el.innerHTML = history.map((h,i) => {
+    const gp = h.goal>0?Math.round((h.totalSales/h.goal)*100):null;
+    const dots=[h.txCount+' sale'+(h.txCount!==1?'s':''),h.totalGuests+' guest'+(h.totalGuests!==1?'s':''),h.totalGuests>0?h.conv+'% conv':null,h.topProduct?'Top: '+h.topProduct:null].filter(Boolean).join(' · ');
+    return `<div class="shift-history-card">
+      <div class="shc-header">
+        <div><div class="shc-date">${h.date}</div><div class="shc-duration">${fmtDur(h.duration)}${h.occ!=null?' · '+h.occ+'% '+h.occType:''}</div></div>
+        <div class="shc-actions">
+          <button class="btn btn-sm" onclick="exportHistoryCSV(${h.id??'null'},${i})">CSV</button>
+          <button class="trash-btn" onclick="deleteHistoryEntry(${h.id??'null'},${i})"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+      <div><span class="shc-total">${fmt(h.totalSales)}</span>${gp!==null?`<span class="shc-goal${gp<80?' miss':''}">${gp}% of ${fmt(h.goal)}</span>`:''}</div>
+      <div class="shc-stats">${dots}</div>
+      ${h.notes?`<div class="shc-notes">${h.notes}</div>`:''}
+    </div>`;
+  }).join('');
+  const agg=history.reduce((a,h)=>({total:a.total+h.totalSales,tx:a.tx+h.txCount,g:a.g+h.totalGuests}),{total:0,tx:0,g:0});
+  const best=history.reduce((a,h)=>Math.max(a,h.totalSales),0);
+  document.getElementById('pastStatShifts').textContent=history.length;
+  document.getElementById('pastStatTotal').textContent=fmt(agg.total);
+  document.getElementById('pastStatAvg').textContent=fmt(history.length?agg.total/history.length:0);
+  document.getElementById('pastStatBest').textContent=fmt(best);
+  document.getElementById('pastStatTx').textContent=agg.tx;
+  document.getElementById('pastStatGuests').textContent=agg.g;
+}
+
+// ─── Leaderboard ─────────────────────────────────────────────
+let lbPeriod = 'alltime';
+
+async function renderLeaderboard() {
+  const el = document.getElementById('leaderboardList');
+  el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
+  try {
+    const board = await apiGet('/api/leaderboard?period=' + lbPeriod);
+    if (!board?.length) { el.innerHTML='<div class="empty-state">No completed shifts yet — end your first shift to appear here!</div>'; return; }
+    const medals = ['🥇','🥈','🥉'];
+    const rankClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    el.innerHTML = board.map((row,i) => {
+      const isMe = row.user.id === currentUser?.id;
+      return `<div class="lb-row ${rankClass(i)}${isMe?' me':''}">
+        <div class="lb-rank">${medals[i] ?? (i+1)}</div>
+        <div class="lb-avatar" style="background:${row.user.color}22;border:2px solid ${row.user.color}44">${row.user.emoji}</div>
+        <div class="lb-info">
+          <div class="lb-name">${row.user.name}${isMe?'<span class="you-tag">YOU</span>':''}</div>
+          <div class="lb-sub">${row.shiftCount} shift${row.shiftCount!==1?'s':''} · ${row.txCount} sale${row.txCount!==1?'s':''} · Avg ${fmt(row.avgPerShift)}</div>
+        </div>
+        <div class="lb-stats">
+          <div class="lb-total">${fmt(row.totalSales)}</div>
+          <div class="lb-detail">${row.conv!==null?row.conv+'% conv':'—'} · Best ${fmt(row.bestShift)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state">Could not load leaderboard — server may be offline.</div>';
+  }
+}
+
+function setLbPeriod(period, btn) {
+  lbPeriod = period;
+  document.querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderLeaderboard();
+}
+
+// ─── Tab switching ────────────────────────────────────────────
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  el.classList.add('active');
+  if (id==='past')        renderPastShifts();
+  if (id==='leaderboard') renderLeaderboard();
+}
+
+// ─── Sale actions ─────────────────────────────────────────────
+function selectProduct(p) {
+  state.selectedProduct = p;
+  const cat = catFor(p);
+  document.getElementById('selProdCat').textContent = cat ? cat.name : '';
+  document.getElementById('selProdName').textContent = p;
+  document.getElementById('priceEntryCard').style.display = '';
+  document.getElementById('saleAmount').value = '';
+  setTimeout(() => document.getElementById('saleAmount').focus(), 50);
+}
+
+function clearProductSelection() {
+  state.selectedProduct = null;
+  document.getElementById('priceEntryCard').style.display = 'none';
+  document.getElementById('salePreview').style.display = 'none';
+}
+
+function logSale() {
+  if (!state.selectedProduct) { alert('Select a product first.'); return; }
+  const amt=parseFloat(document.getElementById('saleAmount').value);
+  if (!amt||amt<=0) { alert('Enter a valid sale amount.'); return; }
+  const guests=parseInt(document.getElementById('saleGuests').value)||1;
+  const note=document.getElementById('saleNote').value.trim();
+  const tier=state.hotelTier||'Premier';
+  const taxRate=state.taxRate??6.5;
+  const inclTax=state.priceIncludesTax!==false;
+  const preTax=inclTax ? amt/(1+taxRate/100) : amt;
+  const taxAmt=Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
+  const commission=calcCommission(state.selectedProduct,preTax,tier);
+  state.sales.push({product:state.selectedProduct,amount:amt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now()});
+  document.getElementById('saleAmount').value='';
+  document.getElementById('saleNote').value='';
+  document.getElementById('saleGuests').value='1';
+  document.getElementById('salePreview').style.display='none';
+  document.getElementById('priceEntryCard').style.display='none';
+  state.selectedProduct=null;
+  state.updatedAt=Date.now();
+  renderProductListItems();
+  render(); scheduleSave();
+}
+function deleteSale(i) { if(confirm('Delete this sale?')){ state.sales.splice(i,1); state.updatedAt=Date.now(); render(); scheduleSave(); } }
+function addGuests(n) { state.guestsExtra+=n; state.updatedAt=Date.now(); render(); scheduleSave(); }
+function promptCustomGuests() { const n=parseInt(prompt('How many guests?')); if(n&&n>0) addGuests(n); }
+function updateGoal() { state.goal=parseFloat(document.getElementById('goalInput').value)||0; state.updatedAt=Date.now(); render(); scheduleSave(); }
+function updateHotelTier() { state.hotelTier=document.getElementById('hotelTierSelect').value; state.updatedAt=Date.now(); render(); scheduleSave(); }
+function updateTaxSettings() {
+  state.taxRate=parseFloat(document.getElementById('taxRateInput').value)||6.5;
+  state.priceIncludesTax=document.getElementById('priceIncludesTaxCheck').checked;
+  state.updatedAt=Date.now(); scheduleSave(); updateSalePreview();
+}
+function updateSalePreview() {
+  const amt=parseFloat(document.getElementById('saleAmount').value)||0;
+  const el=document.getElementById('salePreview');
+  if (!amt||!state.selectedProduct) { el.style.display='none'; return; }
+  const tier=state.hotelTier||'Premier';
+  const taxRate=state.taxRate??6.5;
+  const inclTax=state.priceIncludesTax!==false;
+  const preTax=inclTax?amt/(1+taxRate/100):amt;
+  const taxAmt=inclTax?amt-preTax:amt*taxRate/100;
+  const commission=calcCommission(state.selectedProduct,preTax,tier);
+  const rate=commRateFor(state.selectedProduct,tier);
+  el.style.display='';
+  document.getElementById('previewPreTax').textContent=fmtD(preTax);
+  document.getElementById('previewTax').textContent=fmtD(taxAmt);
+  document.getElementById('previewComm').textContent=fmtD(commission);
+  document.getElementById('previewRate').textContent=(rate*100).toFixed(2)+'%';
+}
+function updateOcc() {
+  const v=document.getElementById('occInput').value;
+  state.occ=v?parseFloat(v):null; state.occType=document.getElementById('occTypeSelect').value;
+  state.updatedAt=Date.now(); render(); scheduleSave();
+}
+
+async function endShift() {
+  if (!state.shiftOpen) return;
+  const total=state.sales.reduce((a,s)=>a+s.amount,0);
+  const guestsSold=state.sales.reduce((a,s)=>a+s.guests,0);
+  const totalGuests=guestsSold+state.guestsExtra;
+  const conv=totalGuests>0?Math.round((guestsSold/totalGuests)*100):0;
+  const shiftEnd=Date.now();
+  const pt={}; state.sales.forEach(s=>{pt[s.product]=(pt[s.product]||0)+s.amount;});
+  const topProduct=Object.keys(pt).sort((a,b)=>pt[b]-pt[a])[0]||null;
+  const totalCommission=Math.round(state.sales.reduce((a,s)=>a+(s.commission||0),0)*100)/100;
+  const entry={
+    date:new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
+    shiftStart:state.shiftStart,shiftEnd,duration:shiftEnd-state.shiftStart,
+    totalSales:total,txCount:guestsSold,saleCount:state.sales.length,goal:state.goal,
+    occ:state.occ,occType:state.occType,totalGuests,guestsSold,conv,
+    totalCommission,hotelTier:state.hotelTier,
+    topProduct,notes:state.notes,sales:state.sales
+  };
+  await addToHistory(entry);
+  historyCache=null;
+  state.shiftOpen=false; state.updatedAt=Date.now();
+  document.getElementById('shiftBadge').textContent='● Closed';
+  document.getElementById('shiftBadge').className='badge badge-closed';
+  document.getElementById('endShiftBtn').disabled=true;
+  lsSet(lsStateKey(),state); pushState();
+  const el=Math.floor((shiftEnd-state.shiftStart)/60000);
+  alert(`Shift ended!\n\nTotal: ${fmt(total)}\nCommission: ${fmtD(totalCommission)} (${state.hotelTier})\nTickets sold: ${guestsSold}\nSales logged: ${state.sales.length}\nGoal: ${state.goal?Math.round((total/state.goal)*100)+'%':'N/A'}\nGuests: ${totalGuests}\nConversion: ${conv}%\nLength: ${el} min\n\nNice work, ${currentUser?.name||'team'}! 🎉`);
+}
+
+function resetAll() {
+  if (!confirm('Start a new shift? Current data will be cleared.')) return;
+  const {goal,occ,occType,hotelTier,taxRate,priceIncludesTax}=state;
+  state={sales:[],guestsExtra:0,goal,occ,occType,hotelTier,taxRate,priceIncludesTax,selectedProduct:null,shiftStart:Date.now(),shiftOpen:true,notes:'',updatedAt:Date.now()};
+  selectedCategory=null;
+  syncUIToState(); document.getElementById('shiftNotes').value='';
+  if (prodChart){prodChart.destroy();prodChart=null;}
+  if (timeChart){timeChart.destroy();timeChart=null;}
+  render(); scheduleSave();
+}
+
+async function deleteHistoryEntry(serverId,idx) {
+  if (!confirm('Delete this shift from history?')) return;
+  const sid=serverId==='null'||serverId===null?null:Number(serverId);
+  await removeFromHistory(sid,idx); renderPastShifts();
+}
+async function clearHistory() {
+  if (!confirm('Clear all your shift history? Cannot be undone.')) return;
+  if (serverOk) { try { await apiDelete('/api/me/history'); } catch {} }
+  historyCache=[]; lsSet(lsHistoryKey(),[]); renderPastShifts();
+}
+
+function exportCSV() {
+  if (!state.sales.length){alert('No sales to export.');return;}
+  triggerCSV([['Time','Product','Amount','Guests','Note'],...state.sales.map(s=>[s.time,'"'+s.product+'"',s.amount,s.guests,'"'+(s.note||'')+'"'])],'shift-'+new Date().toISOString().slice(0,10));
+}
+async function exportHistoryCSV(serverId,idx) {
+  const h=await getHistory(); const sid=serverId==='null'||serverId===null?null:Number(serverId);
+  const entry=sid?h.find(x=>x.id===sid):h[idx];
+  if (!entry?.sales?.length){alert('No sales data.');return;}
+  triggerCSV([['Date','Time','Product','Amount','Guests','Note'],...entry.sales.map(s=>[entry.date,s.time,'"'+s.product+'"',s.amount,s.guests,'"'+(s.note||'')+'"'])],'shift-'+new Date(entry.shiftEnd).toISOString().slice(0,10));
+}
+function triggerCSV(rows,name) {
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.map(r=>r.join(',')).join('\n'));
+  a.download=name+'.csv'; a.click();
+}
+
+// ─── Admin ────────────────────────────────────────────────────
+function showAdminUI() {
+  const isAdmin = !!currentUser?.isAdmin;
+  document.getElementById('adminBadge').style.display     = isAdmin ? '' : 'none';
+  document.getElementById('claimAdminCard').style.display = isAdmin ? 'none' : '';
+  document.getElementById('adminPanelCard').style.display = isAdmin ? '' : 'none';
+  if (isAdmin) loadAdminPanel();
+}
+
+async function claimAdmin() {
+  const secret = document.getElementById('adminSecretInput').value.trim();
+  const err    = document.getElementById('claimAdminError');
+  err.textContent = '';
+  if (!secret) { err.textContent = 'Enter the admin secret.'; return; }
+  try {
+    const data = await apiPost('/api/admin/promote', { secret });
+    if (data?.ok) {
+      currentUser = data.user;
+      setSession(authToken, currentUser);
+      document.getElementById('adminSecretInput').value = '';
+      showAdminUI();
+    }
+  } catch(e) {
+    if (e.message === '403') err.textContent = 'Wrong secret — check with whoever set up the server.';
+    else if (e.message === '503') err.textContent = 'Server has no ADMIN_SECRET configured.';
+    else err.textContent = 'Server offline — try again when connected.';
+  }
+}
+
+async function loadAdminPanel() {
+  const el = document.getElementById('adminUserList');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--text3);font-size:13px">Loading…</div>';
+  try {
+    const users = await apiGet('/api/admin/users');
+    if (!users?.length) { el.innerHTML = '<div class="empty-state" style="border:none">No users.</div>'; return; }
+    el.innerHTML = users.map(u => `
+      <div class="admin-user-row">
+        <div class="lb-avatar" style="width:34px;height:34px;font-size:18px;flex-shrink:0;background:${u.color}22;border:2px solid ${u.color}44">${u.emoji}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            ${u.name}
+            ${u.isAdmin?'<span style="font-size:9px;padding:1px 5px;border-radius:99px;background:#F59E0B;color:#fff;font-weight:700">ADMIN</span>':''}
+            ${u.id===currentUser?.id?'<span style="font-size:9px;padding:1px 5px;border-radius:99px;background:var(--blue-mid);color:#fff;font-weight:700">YOU</span>':''}
+          </div>
+          <div style="font-size:11px;color:var(--text3)">${u.shiftCount} shift${u.shiftCount!==1?'s':''} · $${Math.round(u.totalSales).toLocaleString()} total</div>
+        </div>
+        ${u.id!==currentUser?.id?`<button class="btn btn-danger btn-sm" onclick="deleteAdminUser('${u.id}','${u.name.replace(/'/g,"\\'")}')" style="flex-shrink:0">Remove</button>`:''}
+      </div>`).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state" style="border:none">Could not load — server may be offline.</div>';
+  }
+}
+
+async function deleteAdminUser(id, name) {
+  if (!confirm(`Remove ${name} and all their data? This cannot be undone.`)) return;
+  try {
+    await apiDelete('/api/admin/users/' + id);
+    loadAdminPanel();
+  } catch(e) {
+    alert('Failed: ' + (e.message === '400' ? 'Cannot remove yourself.' : 'Server error.'));
+  }
+}
+
+// ─── Timer ────────────────────────────────────────────────────
+const timerEl=document.getElementById('shiftTimer');
+function updateTimer() {
+  if (!state.shiftOpen) return;
+  const e=Math.floor((Date.now()-state.shiftStart)/1000);
+  timerEl.textContent=[Math.floor(e/3600),Math.floor((e%3600)/60),e%60].map(n=>String(n).padStart(2,'0')).join(':');
+}
+setInterval(updateTimer,1000);
+
+// ─── Boot ─────────────────────────────────────────────────────
+(async function boot() {
+  const session = getSession();
+  if (session) {
+    // Restore immediately from cache — show app without waiting for server
+    currentUser = session.user;
+    authToken   = session.token;
+    showMainApp();
+    await enterApp();
+  } else {
+    showLoginScreen();
+  }
+})();
+</script>
+</body>
+</html>
