@@ -1571,6 +1571,10 @@ async function claimAdmin() {
   if (!secret) { err.textContent = 'Enter the admin secret.'; return; }
   try {
     const data = await apiPost('/api/admin/promote', { secret });
+    if (data === null) {
+      err.textContent = 'Session expired — log out and back in, then try again.';
+      return;
+    }
     if (data?.ok) {
       currentUser = data.user;
       setSession(authToken, currentUser);
@@ -1579,8 +1583,8 @@ async function claimAdmin() {
     }
   } catch(e) {
     if (e.message === '403') err.textContent = 'Wrong secret — check with whoever set up the server.';
-    else if (e.message === '503') err.textContent = 'Server has no ADMIN_SECRET configured.';
-    else err.textContent = 'Server offline — try again when connected.';
+    else if (e.message === '503') err.textContent = 'ADMIN_SECRET not set on server. Set it in Railway → Variables, then trigger a manual redeploy.';
+    else err.textContent = 'Could not reach server — check your connection or try logging out and back in.';
   }
 }
 

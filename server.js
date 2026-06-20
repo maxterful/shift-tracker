@@ -98,7 +98,7 @@ app.get('/api/me', auth, (req, res) => {
 
 // ── Admin: claim admin role ────────────────────────────────
 app.post('/api/admin/promote', auth, (req, res) => {
-  const secret = process.env.ADMIN_SECRET;
+  const secret = (process.env.ADMIN_SECRET || '').trim();
   if (!secret)                    return res.status(503).json({ error: 'ADMIN_SECRET not configured on server' });
   if (req.body.secret !== secret) return res.status(403).json({ error: 'Wrong secret' });
   const all = read(path.join(DATA, 'users.json'), []);
