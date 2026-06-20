@@ -183,27 +183,31 @@ app.delete('/api/me/history', auth, (req, res) => {
 app.get('/api/leaderboard', (_req, res) => {
   const { period = 'alltime' } = _req.query;
   const users    = read(path.join(DATA, 'users.json'), []);
-  const dayStart = new Date().setHours(0, 0, 0, 0);
-  const wkStart  = dayStart - new Date().getDay() * 86400000;
+  const now      = new Date();
+  const dayStart = new Date(now).setHours(0, 0, 0, 0);
+  const wkStart  = dayStart - now.getDay() * 86400000;
+  const moStart  = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
   const board = users.map(user => {
     const hist = read(path.join(DATA, 'users', user.id, 'history.json'), []);
     const rows = hist.filter(h => {
       if (period === 'today') return (h.shiftEnd || 0) >= dayStart;
       if (period === 'week')  return (h.shiftEnd || 0) >= wkStart;
+      if (period === 'month') return (h.shiftEnd || 0) >= moStart;
       return true;
     });
-    const totalSales  = rows.reduce((a, h) => a + (h.totalSales  || 0), 0);
-    const txCount     = rows.reduce((a, h) => a + (h.txCount     || 0), 0);
-    const totalGuests = rows.reduce((a, h) => a + (h.totalGuests || 0), 0);
-    const guestsSold  = rows.reduce((a, h) => a + (h.guestsSold  || 0), 0);
-    const bestShift   = rows.reduce((a, h) => Math.max(a, h.totalSales || 0), 0);
-    const bestSale    = rows.reduce((a, h) =>
+    const totalSales      = rows.reduce((a, h) => a + (h.totalSales      || 0), 0);
+    const totalCommission = rows.reduce((a, h) => a + (h.totalCommission  || 0), 0);
+    const txCount         = rows.reduce((a, h) => a + (h.txCount         || 0), 0);
+    const totalGuests     = rows.reduce((a, h) => a + (h.totalGuests     || 0), 0);
+    const guestsSold      = rows.reduce((a, h) => a + (h.guestsSold      || 0), 0);
+    const bestShift       = rows.reduce((a, h) => Math.max(a, h.totalSales || 0), 0);
+    const bestSale        = rows.reduce((a, h) =>
       Math.max(a, (h.sales || []).reduce((b, s) => Math.max(b, s.amount || 0), 0)), 0);
     const conv = totalGuests > 0 ? Math.round((guestsSold / totalGuests) * 100) : null;
     return {
       user: safeUser(user), shiftCount: rows.length,
-      totalSales, txCount, totalGuests, guestsSold, conv,
+      totalSales, totalCommission, txCount, totalGuests, guestsSold, conv,
       bestShift, bestSale,
       avgPerShift: rows.length ? Math.round(totalSales / rows.length) : 0
     };

@@ -234,18 +234,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .section-title { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 12px; }
 
 /* ── Category pills ───────────────────────────────────────── */
-.cat-pills { display: flex; flex-wrap: wrap; gap: 7px; }
-.cat-pill { display: flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 99px; border: 1.5px solid; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.12s; white-space: nowrap; background: var(--bg); font-family: inherit; }
-.cat-pill:hover { filter: brightness(0.9); }
+.cat-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cat-pill { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 14px 6px 12px; border-radius: 12px; border: 1.5px solid; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.12s; text-align: center; background: var(--bg); font-family: inherit; line-height: 1.3; }
+.cat-pill .cat-icon { font-size: 22px; line-height: 1; }
+.cat-pill:hover { filter: brightness(0.92); transform: translateY(-1px); }
+.cat-pill.active { color: #fff !important; }
 
 /* ── Product list ─────────────────────────────────────────── */
 .product-search { width: 100%; font-size: 14px; padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--bg); color: var(--text); font-family: inherit; margin-bottom: 8px; min-height: 40px; }
 .product-search:focus { outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
-.prod-list { display: flex; flex-direction: column; gap: 4px; max-height: 300px; overflow-y: auto; }
+.prod-list { display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow-y: auto; }
 .prod-list-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg2); border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 500; border: 1px solid transparent; transition: all 0.1s; }
 .prod-list-item:hover { border-color: var(--border2); background: var(--bg3); }
 .pli-count { font-size: 11px; color: var(--text3); flex-shrink: 0; background: var(--bg3); padding: 2px 7px; border-radius: 99px; }
 .pli-count.has-sales { background: var(--green-bg); color: var(--green-mid); font-weight: 600; }
+.prod-subgroup-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); padding: 8px 4px 3px; margin-top: 2px; }
 
 /* ── Selected product header ─────────────────────────────── */
 .sel-prod-cat { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text2); margin-bottom: 3px; }
@@ -650,13 +653,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
         <div class="section-title" style="margin:0">Team leaderboard</div>
         <div class="period-tabs">
-          <button class="period-tab active" onclick="setLbPeriod('alltime',this)">All time</button>
+          <button class="period-tab active" onclick="setLbPeriod('today',this)">Today</button>
           <button class="period-tab" onclick="setLbPeriod('week',this)">This week</button>
-          <button class="period-tab" onclick="setLbPeriod('today',this)">Today</button>
+          <button class="period-tab" onclick="setLbPeriod('month',this)">This month</button>
+          <button class="period-tab" onclick="setLbPeriod('alltime',this)">All time</button>
         </div>
       </div>
       <div id="leaderboardList" class="lb-list">
         <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">Weekly commission</div>
+      <div id="weeklyCommList" class="lb-list">
+        <div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>
       </div>
     </div>
   </div>
@@ -746,86 +756,92 @@ const PRODUCT_CATEGORIES = [
   { name: 'Epic Universe', color: '#7C3AED', icon: 'ti-planet', products: [
     'Epic Universe 1D AD', 'Epic Universe 1D CH', '1D EPIC AP AD'
   ]},
-  { name: 'USF / IOA', color: '#2563EB', icon: 'ti-building-castle', products: [
-    'USF/IOA 1D Base AD', 'USF/IOA 1D Base CH', 'USF/IOA 1D PTP AD', 'USF/IOA 1D PTP CH',
-    '1D USF/IOA BASE CONV <2PM AD', '1D USF/IOA BASE CONV <4PM AD',
-    '1D USF/IOA PTP CONV <2PM AD', '1D USF/IOA PTP CONV <4PM AD'
-  ]},
-  { name: '+Epic Combos', color: '#0D9488', icon: 'ti-layers-union', products: [
-    '1D USF/IOA BASE + 1D EPIC AD', '1D USF/IOA BASE + 1D EPIC CH',
-    '1D USF/IOA PTP + 1D EPIC AD', '1D USF/IOA PTP + 1D EPIC CH',
-    '2 park 1D PTP + 1 DAY AD', '2 park 1D PTP + 1 DAY CH'
-  ]},
-  { name: 'Multi-Day', color: '#16A34A', icon: 'ti-calendar-stats', products: [
-    '3D BASE USF/IOA/EPIC AD', '3D BASE USF/IOA/EPIC CH',
-    '3D PTP USF/IOA/EPIC AD', '3D PTP USF/IOA/EPIC CH',
-    '4D PTP USF/IOA/EPIC AD', '4D PTP USF/IOA/EPIC CH',
-    '5D PTP USF/IOA/EPIC AD', '5D PTP USF/IOA/EPIC CH',
-    '6D PTP USF/IOA/EPIC AD', '6D PTP USF/IOA/EPIC CH',
-    '7D PTP USF/IOA/EPIC AD', '7D PTP USF/IOA/EPIC CH',
-    '3D BASE + 2 DAY FREE AD', '3D BASE + 2 DAY FREE CH',
-    '3D PTP + 2 DAY FREE AD', '3D PTP + 2 DAY FREE CH',
-    '3D BASE + 2 DAY FREE + VB AD', '3D BASE + 2 DAY FREE + VB CH'
-  ]},
-  { name: 'FL Resident', color: '#EA580C', icon: 'ti-sun', products: [
-    'FL USF/IOA 1D BASE AD', 'FL USF/IOA 1D BASE CH',
-    'FL USF/IOA 1D PTP AD', 'FL USF/IOA 1D PTP CH',
-    'FL USF/IOA 2D BASE AD', 'FL USF/IOA 2D BASE CH',
-    'FL USF/IOA 2D PTP AD', 'FL USF/IOA 2D PTP CH',
-    'FL 1D USF/IOA BASE + 1D EPIC AD', 'FL 1D USF/IOA BASE + 1D EPIC CH',
-    'FL 1D USF/IOA PTP + 1D EPIC AD', 'FL 1D USF/IOA PTP + 1D EPIC CH'
-  ]},
-  { name: 'Annual Passes', color: '#D97706', icon: 'ti-ticket', products: [
-    '2PK 12M SEASONAL FL AD', '2PK 12M SEASONAL FL CH',
-    '2PK 12M SEASONAL AD', '2PK 12M SEASONAL CH',
-    '2PK 12M POWER FL AD', '2PK 12M POWER FL CH',
-    '2PK 12M POWER AD', '2PK 12M POWER CH',
-    '2PK 12M PREFERRED FL AD', '2PK 12M PREFERRED FL CH',
-    '2PK 12M PREFERRED AD', '2PK 12M PREFERRED CH',
-    '2PK 12M PREMIER FL AD', '2PK 12M PREMIER FL CH',
-    '2PK 12M PREMIER AD', '2PK 12M PREMIER CH'
-  ]},
-  { name: 'Express', color: '#DC2626', icon: 'ti-bolt', products: [
-    'USF EXPRESS', 'IOA EXPRESS', 'USF/IOA EXPRESS',
-    'USF EXPRESS UNLIMITED', 'IOA EXPRESS UNLIMITED', 'USF/IOA UNLIMITED EXPRESS',
-    '2D USF/IOA UNLIMITED EXPRESS', 'USF EXPRESS >4PM', 'IOA EXPRESS >4PM',
-    'VB EXPRESS', 'VB EXPRESS PLUS', 'EPIC EXPRESS',
-    '2D USF/IOA/EPIC EXPRESS', '3D USF/IOA/EPIC EXPRESS',
-    '4D USF/IOA/EPIC EXPRESS', '5D USF/IOA/EPIC EXPRESS'
-  ]},
-  { name: 'VIP Tours', color: '#9333EA', icon: 'ti-crown', products: [
-    'VIP TOUR: NON-PRIVATE USF', 'VIP TOUR: NON-PRIVATE IOA',
-    'VIP TOUR: PRIVATE USF', 'VIP TOUR: PRIVATE IOA',
-    'VIP TOUR: NON-PRIVATE PTP', 'VIP TOUR: PRIVATE PTP',
-    'VIP TOUR: PRIVATE PTP 2D',
-    'VIP TOUR: NON-PRIVATE EPIC', 'VIP TOUR: PRIVATE EPIC'
-  ]},
+  { name: 'USF / IOA', color: '#2563EB', icon: 'ti-building-castle',
+    subgroups: [
+      { label: 'Base', products: ['USF/IOA 1D Base AD', 'USF/IOA 1D Base CH'] },
+      { label: 'Park-to-Park', products: ['USF/IOA 1D PTP AD', 'USF/IOA 1D PTP CH'] },
+      { label: 'Conversions', products: ['1D USF/IOA BASE CONV <2PM AD', '1D USF/IOA BASE CONV <4PM AD', '1D USF/IOA PTP CONV <2PM AD', '1D USF/IOA PTP CONV <4PM AD'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: '+Epic Combos', color: '#0D9488', icon: 'ti-layers-union',
+    subgroups: [
+      { label: 'Base + Epic', products: ['1D USF/IOA BASE + 1D EPIC AD', '1D USF/IOA BASE + 1D EPIC CH'] },
+      { label: 'PTP + Epic', products: ['1D USF/IOA PTP + 1D EPIC AD', '1D USF/IOA PTP + 1D EPIC CH'] },
+      { label: '2-Park + 1 Day', products: ['2 park 1D PTP + 1 DAY AD', '2 park 1D PTP + 1 DAY CH'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: 'Multi-Day', color: '#16A34A', icon: 'ti-calendar-stats',
+    subgroups: [
+      { label: '3-Day', products: ['3D BASE USF/IOA/EPIC AD', '3D BASE USF/IOA/EPIC CH', '3D PTP USF/IOA/EPIC AD', '3D PTP USF/IOA/EPIC CH'] },
+      { label: '4–7 Day PTP', products: ['4D PTP USF/IOA/EPIC AD', '4D PTP USF/IOA/EPIC CH', '5D PTP USF/IOA/EPIC AD', '5D PTP USF/IOA/EPIC CH', '6D PTP USF/IOA/EPIC AD', '6D PTP USF/IOA/EPIC CH', '7D PTP USF/IOA/EPIC AD', '7D PTP USF/IOA/EPIC CH'] },
+      { label: '+2 Day Free', products: ['3D BASE + 2 DAY FREE AD', '3D BASE + 2 DAY FREE CH', '3D PTP + 2 DAY FREE AD', '3D PTP + 2 DAY FREE CH', '3D BASE + 2 DAY FREE + VB AD', '3D BASE + 2 DAY FREE + VB CH'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: 'FL Resident', color: '#EA580C', icon: 'ti-sun',
+    subgroups: [
+      { label: '1-Day', products: ['FL USF/IOA 1D BASE AD', 'FL USF/IOA 1D BASE CH', 'FL USF/IOA 1D PTP AD', 'FL USF/IOA 1D PTP CH'] },
+      { label: '2-Day', products: ['FL USF/IOA 2D BASE AD', 'FL USF/IOA 2D BASE CH', 'FL USF/IOA 2D PTP AD', 'FL USF/IOA 2D PTP CH'] },
+      { label: '+Epic Combo', products: ['FL 1D USF/IOA BASE + 1D EPIC AD', 'FL 1D USF/IOA BASE + 1D EPIC CH', 'FL 1D USF/IOA PTP + 1D EPIC AD', 'FL 1D USF/IOA PTP + 1D EPIC CH'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: 'Annual Passes', color: '#D97706', icon: 'ti-ticket',
+    subgroups: [
+      { label: 'Seasonal', products: ['2PK 12M SEASONAL FL AD', '2PK 12M SEASONAL FL CH', '2PK 12M SEASONAL AD', '2PK 12M SEASONAL CH'] },
+      { label: 'Power', products: ['2PK 12M POWER FL AD', '2PK 12M POWER FL CH', '2PK 12M POWER AD', '2PK 12M POWER CH'] },
+      { label: 'Preferred', products: ['2PK 12M PREFERRED FL AD', '2PK 12M PREFERRED FL CH', '2PK 12M PREFERRED AD', '2PK 12M PREFERRED CH'] },
+      { label: 'Premier', products: ['2PK 12M PREMIER FL AD', '2PK 12M PREMIER FL CH', '2PK 12M PREMIER AD', '2PK 12M PREMIER CH'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: 'Express', color: '#DC2626', icon: 'ti-bolt',
+    subgroups: [
+      { label: 'USF / IOA', products: ['USF EXPRESS', 'IOA EXPRESS', 'USF/IOA EXPRESS', 'USF EXPRESS UNLIMITED', 'IOA EXPRESS UNLIMITED', 'USF/IOA UNLIMITED EXPRESS', '2D USF/IOA UNLIMITED EXPRESS'] },
+      { label: 'After 4PM', products: ['USF EXPRESS >4PM', 'IOA EXPRESS >4PM'] },
+      { label: 'Volcano Bay', products: ['VB EXPRESS', 'VB EXPRESS PLUS'] },
+      { label: 'Epic Universe', products: ['EPIC EXPRESS', '2D USF/IOA/EPIC EXPRESS', '3D USF/IOA/EPIC EXPRESS', '4D USF/IOA/EPIC EXPRESS', '5D USF/IOA/EPIC EXPRESS'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: 'VIP Tours', color: '#9333EA', icon: 'ti-crown',
+    subgroups: [
+      { label: 'Non-Private', products: ['VIP TOUR: NON-PRIVATE USF', 'VIP TOUR: NON-PRIVATE IOA', 'VIP TOUR: NON-PRIVATE PTP', 'VIP TOUR: NON-PRIVATE EPIC'] },
+      { label: 'Private', products: ['VIP TOUR: PRIVATE USF', 'VIP TOUR: PRIVATE IOA', 'VIP TOUR: PRIVATE PTP', 'VIP TOUR: PRIVATE PTP 2D', 'VIP TOUR: PRIVATE EPIC'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
   { name: 'Volcano Bay', color: '#0284C7', icon: 'ti-waves', products: [
     '1D VB AD', '1D VB CH', '1D VB AD FL', '1D VB CH FL'
   ]},
-  { name: 'Dining', color: '#BE185D', icon: 'ti-tools-kitchen-2', products: [
-    'LEAKY CAULDRON BREAKFAST AD', 'LEAKY CAULDRON BREAKFAST CH',
-    'THREE BROOMSTICKS BREAKFAST AD', 'THREE BROOMSTICKS BREAKFAST CH',
-    'MARVEL CHARACTER DINING AD', 'MARVEL CHARACTER DINING CH',
-    '1D FREESTYLE CUP', '2D FREESTYLE CUP', '3D FREESTYLE CUP',
-    '4D FREESTYLE CUP', '5D FREESTYLE CUP'
-  ]},
-  { name: 'Add-Ons', color: '#6B7280', icon: 'ti-puzzle', products: [
-    '1D MY UNIVERSAL PHOTOS', '3D MY UNIVERSAL PHOTOS', '5D MY UNIVERSAL PHOTOS',
-    'CABANA - SINGLE', 'CABANA - LOWER', 'CABANA - UPPER',
-    'CABANA - KIDS AREA', 'CABANA - FAMILY', 'PREMIUM SEATING',
-    'LANYARD AND POUCH COMBO', 'POTTER LANYARD AND POUCH COMBO',
-    'EVENT LANYARD', 'POUCH ONLY'
-  ]},
-  { name: 'Other', color: '#475569', icon: 'ti-dots-circle-horizontal', products: [
-    '1D I-RIDE', '3D I-RIDE', '5D I-RIDE', '7D I-RIDE', '14D I-RIDE',
-    'One-Way AD Superstar Shuttle', 'One-Way CH Superstar Shuttle',
-    'SeaWorld 1D', 'HHN 1D',
-    'HHN EXPRESS STANDARD', 'HHN AFTER 11 EXPRESS',
-    'HHN UNLIMITED EXPRESS', 'HHN FREQUENT FEAR PASS',
-    'HHN RIP TOUR', 'HHN PREMIUM SCREAM NIGHT',
-    'PRE-PAID REGULAR PARKING', 'DARKMOOR THE EXPERIMENT'
-  ]}
+  { name: 'Dining', color: '#BE185D', icon: 'ti-tools-kitchen-2',
+    subgroups: [
+      { label: 'Breakfast', products: ['LEAKY CAULDRON BREAKFAST AD', 'LEAKY CAULDRON BREAKFAST CH', 'THREE BROOMSTICKS BREAKFAST AD', 'THREE BROOMSTICKS BREAKFAST CH'] },
+      { label: 'Character Dining', products: ['MARVEL CHARACTER DINING AD', 'MARVEL CHARACTER DINING CH'] },
+      { label: 'Freestyle Cups', products: ['1D FREESTYLE CUP', '2D FREESTYLE CUP', '3D FREESTYLE CUP', '4D FREESTYLE CUP', '5D FREESTYLE CUP'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: 'Add-Ons', color: '#6B7280', icon: 'ti-puzzle',
+    subgroups: [
+      { label: 'Photos', products: ['1D MY UNIVERSAL PHOTOS', '3D MY UNIVERSAL PHOTOS', '5D MY UNIVERSAL PHOTOS'] },
+      { label: 'Cabanas', products: ['CABANA - SINGLE', 'CABANA - LOWER', 'CABANA - UPPER', 'CABANA - KIDS AREA', 'CABANA - FAMILY'] },
+      { label: 'Seating & Lanyards', products: ['PREMIUM SEATING', 'LANYARD AND POUCH COMBO', 'POTTER LANYARD AND POUCH COMBO', 'EVENT LANYARD', 'POUCH ONLY'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  },
+  { name: 'Other', color: '#475569', icon: 'ti-dots-circle-horizontal',
+    subgroups: [
+      { label: 'I-Ride', products: ['1D I-RIDE', '3D I-RIDE', '5D I-RIDE', '7D I-RIDE', '14D I-RIDE'] },
+      { label: 'Shuttle', products: ['One-Way AD Superstar Shuttle', 'One-Way CH Superstar Shuttle'] },
+      { label: 'Third Party', products: ['SeaWorld 1D'] },
+      { label: 'HHN', products: ['HHN 1D', 'HHN EXPRESS STANDARD', 'HHN AFTER 11 EXPRESS', 'HHN UNLIMITED EXPRESS', 'HHN FREQUENT FEAR PASS', 'HHN RIP TOUR', 'HHN PREMIUM SCREAM NIGHT'] },
+      { label: 'Parking & Other', products: ['PRE-PAID REGULAR PARKING', 'DARKMOOR THE EXPERIMENT'] }
+    ],
+    get products() { return this.subgroups.flatMap(s => s.products); }
+  }
 ];
 const CHART_COLORS  = ['#2563EB','#16A34A','#7C3AED','#D97706','#0D9488','#DC2626','#0284C7','#9333EA'];
 const EMOJIS        = ['😎','🏄','🎯','💪','⭐','🌟','🔥','💼','🎪','🏆','💎','🚀','👑','✨','🎭','🌊'];
@@ -1254,8 +1270,8 @@ let selectedCategory = null;
 function renderCategoryPills() {
   document.getElementById('catPills').innerHTML = PRODUCT_CATEGORIES.map(cat => {
     const active = selectedCategory && selectedCategory.name === cat.name;
-    return `<button class="cat-pill" style="color:${active?'#fff':cat.color};border-color:${cat.color};background:${active?cat.color:cat.color+'18'}" onclick="selectCategory('${cat.name}')">
-      <i class="ti ${cat.icon}"></i>${cat.name}
+    return `<button class="cat-pill${active?' active':''}" style="color:${active?'#fff':cat.color};border-color:${active?cat.color:cat.color+'50'};background:${active?cat.color:cat.color+'14'}" onclick="selectCategory('${cat.name}')">
+      <i class="ti ${cat.icon} cat-icon"></i>${cat.name}
     </button>`;
   }).join('');
 }
@@ -1279,17 +1295,31 @@ function clearCategorySelection() {
   renderCategoryPills();
 }
 
+function prodItemHTML(p) {
+  const count = state.sales.filter(s => s.product === p).length;
+  const safe = p.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return `<div class="prod-list-item" onclick="selectProduct('${safe}')">
+    <span>${p}</span>
+    <span class="pli-count${count>0?' has-sales':''}">${count > 0 ? count+' sold' : '+'}</span>
+  </div>`;
+}
+
 function renderProductListItems() {
   if (!selectedCategory) return;
   const query = (document.getElementById('productSearch')?.value || '').toLowerCase();
-  const list = selectedCategory.products.filter(p => !query || p.toLowerCase().includes(query));
-  document.getElementById('prodList').innerHTML = list.map(p => {
-    const count = state.sales.filter(s => s.product === p).length;
-    return `<div class="prod-list-item" onclick="selectProduct('${p}')">
-      <span>${p}</span>
-      <span class="pli-count${count>0?' has-sales':''}">${count > 0 ? count+' sold' : '+'}</span>
-    </div>`;
-  }).join('') || '<div style="color:var(--text3);font-size:13px;text-align:center;padding:1rem 0">No products match</div>';
+  const cat   = selectedCategory;
+  const el    = document.getElementById('prodList');
+
+  if (query || !cat.subgroups) {
+    const list = cat.products.filter(p => !query || p.toLowerCase().includes(query));
+    el.innerHTML = list.map(prodItemHTML).join('')
+      || '<div style="color:var(--text3);font-size:13px;text-align:center;padding:1rem 0">No products match</div>';
+    return;
+  }
+
+  el.innerHTML = cat.subgroups.map(sg =>
+    `<div class="prod-subgroup-label">${sg.label}</div>` + sg.products.map(prodItemHTML).join('')
+  ).join('');
 }
 
 function filterProducts() { renderProductListItems(); }
@@ -1368,7 +1398,7 @@ async function renderPastShifts() {
 }
 
 // ─── Leaderboard ─────────────────────────────────────────────
-let lbPeriod = 'alltime';
+let lbPeriod = 'today';
 
 async function renderLeaderboard() {
   const el = document.getElementById('leaderboardList');
@@ -1405,6 +1435,32 @@ function setLbPeriod(period, btn) {
   renderLeaderboard();
 }
 
+async function renderWeeklyComm() {
+  const el = document.getElementById('weeklyCommList');
+  try {
+    const board = await apiGet('/api/leaderboard?period=week');
+    const sorted = [...(board || [])].sort((a,b) => b.totalCommission - a.totalCommission).filter(r => r.totalCommission > 0);
+    if (!sorted.length) { el.innerHTML = '<div class="empty-state">No commission earned this week yet</div>'; return; }
+    el.innerHTML = sorted.map((row, i) => {
+      const isMe = row.user.id === currentUser?.id;
+      return `<div class="lb-row${isMe?' me':''}">
+        <div class="lb-rank" style="font-size:14px;font-weight:700">${i+1}</div>
+        <div class="lb-avatar" style="background:${row.user.color}22;border:2px solid ${row.user.color}44">${row.user.emoji}</div>
+        <div class="lb-info">
+          <div class="lb-name">${row.user.name}${isMe?'<span class="you-tag">YOU</span>':''}</div>
+          <div class="lb-sub">${row.shiftCount} shift${row.shiftCount!==1?'s':''} · ${fmt(row.totalSales)} in sales</div>
+        </div>
+        <div class="lb-stats">
+          <div class="lb-total" style="color:var(--green-mid)">${fmtD(row.totalCommission)}</div>
+          <div class="lb-detail">commission</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state">Could not load</div>';
+  }
+}
+
 // ─── Tab switching ────────────────────────────────────────────
 function switchTab(id, el) {
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -1412,7 +1468,7 @@ function switchTab(id, el) {
   document.getElementById('tab-'+id).classList.add('active');
   el.classList.add('active');
   if (id==='past')        renderPastShifts();
-  if (id==='leaderboard') renderLeaderboard();
+  if (id==='leaderboard') { renderLeaderboard(); renderWeeklyComm(); }
 }
 
 // ─── Sale actions ─────────────────────────────────────────────
