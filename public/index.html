@@ -1116,6 +1116,7 @@ function setSyncUI(status, label) {
 // ─── Per-user localStorage keys ──────────────────────────────
 const lsStateKey   = () => 'shiftState_'   + (currentUser?.id || 'anon');
 const lsHistoryKey = () => 'shiftHistory_' + (currentUser?.id || 'anon');
+const lsPendingKey = () => 'pendingHistory_' + (currentUser?.id || 'anon');
 function lsGet(key, fb) { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fb; } catch { return fb; } }
 function lsSet(key, v)  { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }
 
@@ -1143,24 +1144,55 @@ async function pushState() {
 // ─── History ─────────────────────────────────────────────────
 async function getHistory() {
   if (historyCache !== null) return historyCache;
+  const pending = lsGet(lsPendingKey(), []);
   if (serverOk) {
     try {
       const data = await apiGet('/api/me/history');
       if (data !== null) {
-        historyCache = data;
+        // Flush pending queue: retry any shifts that failed to save previously
+        const stillPending = [];
+        for (const entry of pending) {
+          try {
+            const r = await apiPost('/api/me/history', entry);
+            if (r !== null) entry.id = r.id;
+            else stillPending.push(entry);
+          } catch { stillPending.push(entry); }
+        }
+        lsSet(lsPendingKey(), stillPending);
+        historyCache = [...data];
+        // Merge any still-pending entries not yet on server
+        for (const p of stillPending) {
+          if (!historyCache.some(h => h.shiftEnd && h.shiftEnd === p.shiftEnd))
+            historyCache.unshift(p);
+        }
+        historyCache.sort((a, b) => (b.shiftEnd || 0) - (a.shiftEnd || 0));
         lsSet(lsHistoryKey(), historyCache);
         return historyCache;
       }
     } catch {}
   }
-  // Server offline or returned null (session expired) — use local cache
-  historyCache = lsGet(lsHistoryKey(), []);
+  // Server offline or session expired — merge localStorage + pending
+  const stored = lsGet(lsHistoryKey(), []);
+  historyCache = [...stored];
+  for (const p of pending) {
+    if (!historyCache.some(h => h.shiftEnd && h.shiftEnd === p.shiftEnd))
+      historyCache.unshift(p);
+  }
   return historyCache;
 }
 async function addToHistory(entry) {
   if (!historyCache) historyCache = lsGet(lsHistoryKey(), []);
+  let savedToServer = false;
   if (serverOk) {
-    try { const { id } = await apiPost('/api/me/history', entry); entry.id = id; } catch {}
+    try {
+      const r = await apiPost('/api/me/history', entry);
+      if (r !== null) { entry.id = r.id; savedToServer = true; }
+    } catch {}
+  }
+  if (!savedToServer) {
+    const pending = lsGet(lsPendingKey(), []);
+    if (!pending.some(p => p.shiftEnd === entry.shiftEnd)) pending.push(entry);
+    lsSet(lsPendingKey(), pending);
   }
   historyCache.unshift(entry);
   lsSet(lsHistoryKey(), historyCache);
@@ -1349,6 +1381,36 @@ function showPinError(msg) {
   setTimeout(() => { document.querySelectorAll('.pin-dot').forEach(d => { d.className = 'pin-dot'; }); }, 700);
 }
 
+// ─── Recover closed-but-unsynced shift ───────────────────────
+async function recoverClosedShiftIfNeeded() {
+  if (state.shiftOpen !== false || !state.sales?.length) return;
+  const history = await getHistory();
+  const approxEnd = state.updatedAt || state.shiftStart;
+  if (history.some(h => Math.abs((h.shiftEnd || 0) - approxEnd) < 60000)) return;
+  const sales = state.sales;
+  const total = Math.round(sales.reduce((a, s) => a + s.amount, 0) * 100) / 100;
+  const guestsSold = sales.reduce((a, s) => a + s.guests, 0);
+  const totalGuests = guestsSold + (state.guestsExtra || 0);
+  const pt = {}; sales.forEach(s => { pt[s.product] = (pt[s.product] || 0) + s.amount; });
+  const entry = {
+    date: new Date(state.shiftStart).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+    startTime: new Date(state.shiftStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    endTime: new Date(approxEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    shiftStart: state.shiftStart, shiftEnd: approxEnd,
+    duration: approxEnd - state.shiftStart,
+    totalSales: total, txCount: guestsSold, saleCount: sales.length,
+    goal: state.goal, occ: state.occ, occType: state.occType,
+    totalGuests, guestsSold,
+    conv: totalGuests > 0 ? Math.round(guestsSold / totalGuests * 100) : 0,
+    totalCommission: Math.round(sales.reduce((a, s) => a + (s.commission || 0), 0) * 100) / 100,
+    hotelTier: state.hotelTier, hotel: state.hotel || null,
+    shiftType: state.shiftType || 'A', notes: state.notes || '',
+    topProduct: Object.keys(pt).sort((a, b) => pt[b] - pt[a])[0] || null,
+    sales
+  };
+  await addToHistory(entry);
+}
+
 // ─── App init ────────────────────────────────────────────────
 function showLoginScreen() {
   document.getElementById('loginScreen').style.display = 'flex';
@@ -1382,6 +1444,7 @@ async function enterApp(freshLogin = false) {
       syncUIToState();
       render();
     }
+    recoverClosedShiftIfNeeded(); // auto-save any shift that ended but failed to sync
   } catch {
     setSyncUI('offline', 'Local only');
   }
