@@ -201,6 +201,55 @@ app.patch('/api/me/history/:id', auth, (req, res) => {
   res.json({ ok: true, entry: h[idx] });
 });
 
+// ── Update a past shift (edit sales) ─────────────────────
+app.put('/api/me/history/:id', auth, (req, res) => {
+  const f   = path.join(udir(req.uid), 'history.json');
+  const h   = read(f, []);
+  const idx = h.findIndex(e => e.id === Number(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  const sales = req.body.sales || h[idx].sales || [];
+  const guestsSold = sales.reduce((a, s) => a + (s.guests || 0), 0);
+  const pt = {};
+  sales.forEach(s => { pt[s.product] = (pt[s.product] || 0) + s.amount; });
+  h[idx] = {
+    ...h[idx], ...req.body, id: h[idx].id, sales,
+    totalSales:      Math.round(sales.reduce((a, s) => a + s.amount,            0) * 100) / 100,
+    totalCommission: Math.round(sales.reduce((a, s) => a + (s.commission || 0), 0) * 100) / 100,
+    guestsSold, txCount: guestsSold, saleCount: sales.length,
+    topProduct: Object.keys(pt).sort((a, b) => pt[b] - pt[a])[0] || null,
+  };
+  write(f, h);
+  res.json({ ok: true, entry: h[idx] });
+});
+
+// ── Insights: top products + hourly data across all users ─
+app.get('/api/insights', (_req, res) => {
+  const users = read(path.join(DATA, 'users.json'), []);
+  const productStats = {};
+  const hourly = Array.from({ length: 24 }, () => ({ count: 0, total: 0 }));
+  users.forEach(user => {
+    read(path.join(DATA, 'users', user.id, 'history.json'), []).forEach(shift => {
+      (shift.sales || []).forEach(sale => {
+        if (!sale.product) return;
+        if (!productStats[sale.product]) productStats[sale.product] = { count: 0, revenue: 0, commission: 0 };
+        productStats[sale.product].count    += (sale.guests || 1);
+        productStats[sale.product].revenue  += (sale.amount || 0);
+        productStats[sale.product].commission += (sale.commission || 0);
+        if (sale.ts) {
+          const hr = new Date(sale.ts).getHours();
+          hourly[hr].count++;
+          hourly[hr].total += (sale.amount || 0);
+        }
+      });
+    });
+  });
+  const topProducts = Object.entries(productStats)
+    .map(([product, s]) => ({ product, ...s }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 15);
+  res.json({ topProducts, hourly });
+});
+
 // ── Leaderboard ───────────────────────────────────────────
 app.get('/api/leaderboard', (_req, res) => {
   const { period = 'alltime' } = _req.query;

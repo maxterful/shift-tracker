@@ -313,6 +313,59 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .past-stat { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; }
 .past-stat-val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 .past-stat-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; font-weight: 500; }
+/* Milestone toast */
+.milestone-toast { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.8); background:var(--green-dark); color:#fff; border-radius:20px; padding:20px 28px; text-align:center; z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s,transform 0.25s; box-shadow:0 8px 40px rgba(0,0,0,0.4); min-width:220px; }
+.milestone-toast.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
+.milestone-toast-icon { font-size:40px; display:block; margin-bottom:6px; }
+.milestone-toast-msg { font-size:18px; font-weight:700; }
+.milestone-toast-sub { font-size:13px; opacity:0.85; margin-top:4px; }
+/* Shift setup modal (post-login) */
+.shift-setup-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:300; align-items:center; justify-content:center; }
+.shift-setup-inner { background:var(--bg); border-radius:16px; padding:24px 20px; width:calc(100% - 32px); max-width:420px; max-height:90vh; overflow-y:auto; }
+.shift-setup-title { font-size:20px; font-weight:800; margin-bottom:4px; }
+.shift-setup-sub { font-size:13px; color:var(--text2); margin-bottom:20px; }
+.shift-type-row { display:flex; gap:8px; margin-top:6px; }
+.shift-type-btn { flex:1; padding:12px; border:2px solid var(--border2); border-radius:var(--radius); background:var(--bg2); color:var(--text); font-size:15px; font-weight:700; cursor:pointer; transition:all 0.15s; }
+.shift-type-btn.active { border-color:var(--blue-mid); background:var(--blue-dark); color:#fff; }
+/* End shift modal */
+.end-shift-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:300; align-items:center; justify-content:center; }
+.end-shift-inner { background:var(--bg); border-radius:16px; padding:24px 20px; width:calc(100% - 32px); max-width:420px; max-height:90vh; overflow-y:auto; }
+.end-shift-title { font-size:20px; font-weight:800; margin-bottom:16px; }
+.end-stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+.end-stat { background:var(--bg2); border-radius:var(--radius); padding:10px 12px; }
+.end-stat-val { font-size:17px; font-weight:700; }
+.end-stat-lbl { font-size:11px; color:var(--text3); margin-top:2px; }
+/* Edit sale modal */
+.edit-sale-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.65); z-index:400; align-items:center; justify-content:center; }
+.edit-sale-inner { background:var(--bg); border-radius:16px; padding:20px; width:calc(100% - 32px); max-width:380px; }
+.edit-sale-title { font-size:16px; font-weight:700; margin-bottom:14px; }
+/* Sale expand in past shifts */
+.shc-sales-list { margin-top:10px; padding-top:10px; border-top:0.5px solid var(--border); display:none; }
+.shc-sale-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:0.5px solid var(--border2); font-size:12px; }
+.shc-sale-row:last-child { border-bottom:none; }
+.shc-sale-prod { flex:1; font-weight:500; }
+.shc-sale-amt { font-weight:700; color:var(--text); }
+.shc-sale-comm { font-size:11px; color:var(--green-mid); }
+/* Quick repeat */
+.repeat-btn { width:100%; margin-top:6px; background:var(--bg2); border:1px solid var(--border2); color:var(--text2); font-size:13px; }
+.repeat-btn:active { opacity:0.7; }
+/* Top products bar */
+.top-prod-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:0.5px solid var(--border2); font-size:13px; }
+.top-prod-row:last-child { border-bottom:none; }
+.top-prod-name { flex:1; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.top-prod-bar-wrap { width:90px; height:6px; background:var(--border2); border-radius:3px; flex-shrink:0; }
+.top-prod-bar { height:6px; border-radius:3px; background:var(--blue-mid); }
+.top-prod-val { font-weight:700; width:68px; text-align:right; flex-shrink:0; }
+/* Hourly chart bars */
+.hourly-row { display:flex; align-items:flex-end; gap:3px; height:80px; padding-bottom:20px; position:relative; }
+.hourly-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.hourly-bar { width:100%; border-radius:3px 3px 0 0; background:var(--blue-mid); transition:height 0.3s; min-height:0; }
+.hourly-lbl { font-size:9px; color:var(--text3); margin-top:3px; transform:rotate(-45deg); white-space:nowrap; }
+/* Record badge */
+.record-badge { display:inline-block; background:var(--amber-dark,#92400e); color:var(--amber-mid,#F59E0B); font-size:10px; font-weight:700; padding:2px 6px; border-radius:99px; margin-left:6px; vertical-align:middle; }
+/* Leaderboard insights subtabs */
+.lb-subtab { font-size:12px; padding:4px 12px; border-radius:99px; border:1px solid var(--border2); background:transparent; color:var(--text2); cursor:pointer; transition:all 0.15s; }
+.lb-subtab.active { background:var(--blue-mid); border-color:var(--blue-mid); color:#fff; }
 
 /* ── Leaderboard ──────────────────────────────────────────── */
 .period-tabs { display: flex; gap: 4px; }
@@ -584,6 +637,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="btn btn-primary" onclick="logSale()" style="width:100%;margin-top:6px">
         <i class="ti ti-plus" style="margin-right:5px"></i>Log sale
       </button>
+      <button class="btn repeat-btn" id="repeatBtn" style="display:none" onclick="quickRepeat()">
+        <i class="ti ti-refresh" style="margin-right:5px"></i><span id="repeatBtnLabel">Repeat last sale</span>
+      </button>
     </div>
   </div>
 
@@ -662,6 +718,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="past-stat"><div class="past-stat-val" id="pastStatTx">0</div><div class="past-stat-lbl">Total sales</div></div>
         <div class="past-stat"><div class="past-stat-val" id="pastStatGuests">0</div><div class="past-stat-lbl">Total guests</div></div>
       </div>
+      <div class="section-title" style="margin-top:14px;margin-bottom:10px">Personal records</div>
+      <div id="personalRecords" style="font-size:13px;color:var(--text2)">—</div>
     </div>
   </div>
 
@@ -687,6 +745,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>
       </div>
     </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin:0">Team insights</div>
+        <div style="display:flex;gap:6px">
+          <button class="lb-subtab active" id="insightTabProducts" onclick="switchInsightTab('products',this)">Top products</button>
+          <button class="lb-subtab" id="insightTabHourly" onclick="switchInsightTab('hourly',this)">Best times</button>
+        </div>
+      </div>
+      <div id="insightsProducts"><div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div></div>
+      <div id="insightsHourly" style="display:none"><div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div></div>
+    </div>
   </div>
 
   <!-- SETUP -->
@@ -697,6 +766,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <option value="">— Select your hotel —</option>
       </select>
       <div style="font-size:11px;color:var(--text3);margin-top:6px">Selecting a hotel automatically sets your commission tier.</div>
+      <div style="margin-top:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">Shift type</label>
+        <div class="shift-type-row">
+          <button class="shift-type-btn active" id="shiftTypeA" onclick="setShiftType('A')">A Shift</button>
+          <button class="shift-type-btn" id="shiftTypeB" onclick="setShiftType('B')">B Shift</button>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="section-title">Shift goal & occupancy</div>
@@ -839,7 +915,7 @@ const PRODUCT_CATEGORIES = [
     get products() { return this.subgroups.flatMap(s => s.products); }
   },
   { name: 'Volcano Bay', color: '#0284C7', icon: 'ti-volcano', products: [
-    '1D VB AD', '1D VB CH', '1D VB AD FL', '1D VB CH FL'
+    '1D VB AD', '1D VB CH', '1D VB AD FL', '1D VB CH FL', '1D VB NIGHTS'
   ]},
   { name: 'Dining', color: '#BE185D', icon: 'ti-tools-kitchen-2',
     subgroups: [
@@ -868,6 +944,40 @@ const PRODUCT_CATEGORIES = [
     get products() { return this.subgroups.flatMap(s => s.products); }
   }
 ];
+// Prices that are already tax-inclusive — auto-filled when product is selected
+const PRODUCT_PRICES = {
+  // Freestyle Cups
+  '1D FREESTYLE CUP': 21.29, '2D FREESTYLE CUP': 38.32, '3D FREESTYLE CUP': 51.09,
+  '4D FREESTYLE CUP': 68.12, '5D FREESTYLE CUP': 85.15,
+  // Breakfast
+  'LEAKY CAULDRON BREAKFAST AD': 21.29, 'LEAKY CAULDRON BREAKFAST CH': 21.29,
+  'THREE BROOMSTICKS BREAKFAST AD': 21.29, 'THREE BROOMSTICKS BREAKFAST CH': 21.29,
+  // Lanyards
+  'LANYARD AND POUCH COMBO': 21.29, 'POTTER LANYARD AND POUCH COMBO': 21.29,
+  'EVENT LANYARD': 14.91, 'POUCH ONLY': 8.52,
+  // Photos
+  '1D MY UNIVERSAL PHOTOS': 95.84, '3D MY UNIVERSAL PHOTOS': 138.44, '5D MY UNIVERSAL PHOTOS': 159.74,
+  // Annual Passes — Seasonal
+  '2PK 12M SEASONAL FL AD': 346.12, '2PK 12M SEASONAL FL CH': 346.12,
+  '2PK 12M SEASONAL AD': 452.62,    '2PK 12M SEASONAL CH': 452.62,
+  // Annual Passes — Power
+  '2PK 12M POWER FL AD': 399.37, '2PK 12M POWER FL CH': 399.37,
+  '2PK 12M POWER AD': 505.87,    '2PK 12M POWER CH': 505.87,
+  // Annual Passes — Preferred
+  '2PK 12M PREFERRED FL AD': 564.44, '2PK 12M PREFERRED FL CH': 564.44,
+  '2PK 12M PREFERRED AD': 670.94,    '2PK 12M PREFERRED CH': 670.94,
+  // Annual Passes — Premier
+  '2PK 12M PREMIER FL AD': 841.32, '2PK 12M PREMIER FL CH': 841.34,
+  '2PK 12M PREMIER AD': 963.82,    '2PK 12M PREMIER CH': 963.82,
+  // I-Ride
+  '1D I-RIDE': 8.00, '3D I-RIDE': 10.00, '5D I-RIDE': 12.00,
+  '7D I-RIDE': 18.00, '14D I-RIDE': 22.00,
+  // Shuttle
+  'One-Way AD Superstar Shuttle': 23.00, 'One-Way CH Superstar Shuttle': 23.00,
+  // Third Party
+  'SeaWorld 1D': 109.69,
+};
+
 const HOTEL_TIERS = {
   'Premier': [
     'Loews Portofino Bay Hotel','Hard Rock Hotel','Loews Royal Pacific Resort',
@@ -1093,7 +1203,7 @@ async function startLogin(idx) {
   try {
     const { token, user: freshUser } = await openPinModal(user.id);
     setSession(token, freshUser);
-    await enterApp();
+    await enterApp(true);
   } catch(e) {
     if (e?.message !== 'cancelled') {
       document.getElementById('loginError').textContent = e?.message || 'Login failed';
@@ -1233,7 +1343,7 @@ function showMainApp() {
   showAdminUI();
 }
 
-async function enterApp() {
+async function enterApp(freshLogin = false) {
   showMainApp();
 
   // Load local state immediately for instant render
@@ -1259,6 +1369,9 @@ async function enterApp() {
   buildHotelSelect();
   renderCategoryPills();
   updateTimer();
+
+  // Show shift setup on fresh PIN login
+  if (freshLogin) openShiftSetupModal();
 }
 
 async function switchUser() {
@@ -1266,7 +1379,7 @@ async function switchUser() {
   try { await apiPost('/api/logout'); } catch {}
   clearSession();
   historyCache = null;
-  state = { sales:[], guestsExtra:0, goal:0, occ:null, occType:'Hotel', hotelTier:'Premier', taxRate:6.5, priceIncludesTax:true, selectedProduct:null, shiftStart:Date.now(), shiftOpen:true, notes:'', updatedAt:0 };
+  state = { sales:[], guestsExtra:0, goal:0, occ:null, occType:'Hotel', hotelTier:'Premier', taxRate:6.5, priceIncludesTax:true, selectedProduct:null, shiftStart:Date.now(), shiftOpen:true, notes:'', shiftType:'A', hotel:null, updatedAt:0 };
   selectedCategory = null;
   if (prodChart) { prodChart.destroy(); prodChart = null; }
   if (timeChart) { timeChart.destroy(); timeChart = null; }
@@ -1294,6 +1407,9 @@ function syncUIToState() {
   document.getElementById('taxRateInput').value       = state.taxRate ?? 6.5;
   document.getElementById('priceIncludesTaxCheck').checked = state.priceIncludesTax !== false;
   if (state.hotel) document.getElementById('hotelSelect').value = state.hotel;
+  const st = state.shiftType || 'A';
+  document.getElementById('shiftTypeA').classList.toggle('active', st==='A');
+  document.getElementById('shiftTypeB').classList.toggle('active', st==='B');
   if (!state.shiftOpen) {
     document.getElementById('shiftBadge').textContent = '● Closed';
     document.getElementById('shiftBadge').className   = 'badge badge-closed';
@@ -1461,15 +1577,26 @@ async function renderPastShifts() {
   const history = await getHistory();
   if (!history.length) { el.innerHTML='<div class="empty-state">No completed shifts yet.<br>End a shift to save it here.</div>'; sc.style.display='none'; return; }
   sc.style.display='';
+  const bestShift = history.reduce((a,h)=>Math.max(a,h.totalSales),0);
   el.innerHTML = history.map((h,i) => {
     const gp = h.goal>0?Math.round((h.totalSales/h.goal)*100):null;
     const timeStr = h.startTime ? `${h.startTime}${h.endTime?' – '+h.endTime:''}` : '';
     const dots=[h.txCount+' sale'+(h.txCount!==1?'s':''),h.totalGuests+' guest'+(h.totalGuests!==1?'s':''),h.totalGuests>0?h.conv+'% conv':null,h.topProduct?'Top: '+h.topProduct:null].filter(Boolean).join(' · ');
     const sid = h.id ?? 'null';
+    const isRecord = h.totalSales >= bestShift && bestShift > 0;
+    const salesRows = (h.sales||[]).map((s,si)=>`
+      <div class="shc-sale-row">
+        <span class="shc-sale-prod">${s.product}</span>
+        <span style="font-size:11px;color:var(--text3)">${s.guests>1?s.guests+'× ':''}</span>
+        <span class="shc-sale-amt">${fmtD(s.amount)}</span>
+        ${s.commission!=null?`<span class="shc-sale-comm">+${fmtD(s.commission)}</span>`:''}
+        <button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEditSaleModal('${sid}',${si})"><i class="ti ti-pencil"></i></button>
+        <button class="trash-btn" style="font-size:13px" onclick="deleteSaleFromShift('${sid}',${si})"><i class="ti ti-trash"></i></button>
+      </div>`).join('');
     return `<div class="shift-history-card">
       <div class="shc-header">
         <div>
-          <div class="shc-date">${h.date}${timeStr?`<span class="shc-time" style="margin-left:6px">${timeStr}</span>`:''}</div>
+          <div class="shc-date">${h.date}${h.shiftType?`<span style="font-size:10px;font-weight:700;background:var(--bg2);color:var(--text2);padding:2px 6px;border-radius:99px;margin-left:6px">${h.shiftType} Shift</span>`:''}${timeStr?`<span class="shc-time" style="margin-left:6px">${timeStr}</span>`:''}</div>
           <div class="shc-duration">${h.duration?fmtDur(h.duration):''}${h.occ!=null?' · '+h.occ+'% '+h.occType:''}</div>
           ${h.hotel?`<div class="shc-hotel">${h.hotel} · ${h.hotelTier||''}</div>`:''}
         </div>
@@ -1479,20 +1606,36 @@ async function renderPastShifts() {
           <button class="trash-btn" onclick="deleteHistoryEntry(${sid},${i})"><i class="ti ti-trash"></i></button>
         </div>
       </div>
-      <div><span class="shc-total">${fmt(h.totalSales)}</span>${gp!==null?`<span class="shc-goal${gp<80?' miss':''}">${gp}% of ${fmt(h.goal)}</span>`:''}</div>
+      <div><span class="shc-total">${fmt(h.totalSales)}</span>${isRecord?'<span class="record-badge">PB</span>':''}${gp!==null?`<span class="shc-goal${gp<80?' miss':''}">${gp}% of ${fmt(h.goal)}</span>`:''}</div>
       <div class="shc-stats">${dots}</div>
       ${h.totalCommission?`<div class="shc-stats" style="color:var(--green-mid);font-weight:600">Commission: ${fmtD(h.totalCommission)}</div>`:''}
       ${h.notes?`<div class="shc-notes">${h.notes}</div>`:''}
+      ${(h.sales||[]).length?`<button class="btn btn-sm" style="margin-top:8px;font-size:11px" onclick="toggleShiftSales('${sid}')"><i class="ti ti-list"></i> ${h.sales.length} sales</button>
+      <div class="shc-sales-list" id="shcSales_${sid}">${salesRows}</div>`:''}
     </div>`;
   }).join('');
   const agg=history.reduce((a,h)=>({total:a.total+h.totalSales,tx:a.tx+h.txCount,g:a.g+h.totalGuests}),{total:0,tx:0,g:0});
-  const best=history.reduce((a,h)=>Math.max(a,h.totalSales),0);
   document.getElementById('pastStatShifts').textContent=history.length;
   document.getElementById('pastStatTotal').textContent=fmt(agg.total);
   document.getElementById('pastStatAvg').textContent=fmt(history.length?agg.total/history.length:0);
-  document.getElementById('pastStatBest').textContent=fmt(best);
+  document.getElementById('pastStatBest').textContent=fmt(bestShift);
   document.getElementById('pastStatTx').textContent=agg.tx;
   document.getElementById('pastStatGuests').textContent=agg.g;
+  // Personal records
+  const bestSale = history.reduce((a,h)=>{
+    const top=(h.sales||[]).reduce((b,s)=>Math.max(b,s.amount||0),0);
+    return Math.max(a,top);
+  },0);
+  const bestComm = history.reduce((a,h)=>Math.max(a,h.totalCommission||0),0);
+  const bestTx   = history.reduce((a,h)=>Math.max(a,h.txCount||0),0);
+  document.getElementById('personalRecords').innerHTML = [
+    { icon:'🏆', label:'Best shift', val: fmt(bestShift) },
+    { icon:'💰', label:'Best commission', val: fmtD(bestComm) },
+    { icon:'🎟', label:'Most tickets (shift)', val: bestTx },
+    { icon:'💎', label:'Biggest single sale', val: fmtD(bestSale) },
+  ].map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border2)">
+    <span>${r.icon} ${r.label}</span><strong>${r.val}</strong>
+  </div>`).join('');
 }
 
 // ─── Leaderboard ─────────────────────────────────────────────
@@ -1558,6 +1701,238 @@ async function renderWeeklyComm() {
   } catch {
     el.innerHTML = '<div class="empty-state">Could not load</div>';
   }
+}
+
+// ─── Shift setup modal (post-login) ──────────────────────────
+function buildSetupHotelSelect() {
+  const sel = document.getElementById('setupHotelSelect');
+  const labels = { Premier: 'On-Site · Premier', 'Non-Premier': 'On-Site · Non-Premier', UPH: 'Partner Hotels (UPH)' };
+  sel.innerHTML = '<option value="">— Select your hotel —</option>';
+  for (const [tier, hotels] of Object.entries(HOTEL_TIERS)) {
+    const og = document.createElement('optgroup'); og.label = labels[tier];
+    hotels.forEach(h => { const o = document.createElement('option'); o.value = o.textContent = h; og.appendChild(o); });
+    sel.appendChild(og);
+  }
+}
+let _setupShiftType = 'A';
+function pickSetupShiftType(t) {
+  _setupShiftType = t;
+  document.getElementById('setupShiftTypeA').classList.toggle('active', t==='A');
+  document.getElementById('setupShiftTypeB').classList.toggle('active', t==='B');
+}
+function openShiftSetupModal() {
+  _setupShiftType = state.shiftType || 'A';
+  buildSetupHotelSelect();
+  if (state.hotel) document.getElementById('setupHotelSelect').value = state.hotel;
+  document.getElementById('setupShiftTypeA').classList.toggle('active', _setupShiftType==='A');
+  document.getElementById('setupShiftTypeB').classList.toggle('active', _setupShiftType==='B');
+  document.getElementById('shiftSetupModal').style.display = 'flex';
+}
+function saveShiftSetup() {
+  const hotel = document.getElementById('setupHotelSelect').value;
+  state.hotel = hotel || null;
+  state.shiftType = _setupShiftType;
+  if (hotel) {
+    state.hotelTier = tierForHotel(hotel);
+    document.getElementById('hotelTierSelect').value = state.hotelTier;
+  }
+  // sync to setup tab
+  if (hotel) document.getElementById('hotelSelect').value = hotel;
+  document.getElementById('shiftTypeA').classList.toggle('active', _setupShiftType==='A');
+  document.getElementById('shiftTypeB').classList.toggle('active', _setupShiftType==='B');
+  document.getElementById('shiftSetupModal').style.display = 'none';
+  state.updatedAt = Date.now(); render(); scheduleSave();
+}
+
+// ─── A/B shift type ───────────────────────────────────────────
+function setShiftType(t) {
+  state.shiftType = t;
+  document.getElementById('shiftTypeA').classList.toggle('active', t==='A');
+  document.getElementById('shiftTypeB').classList.toggle('active', t==='B');
+  state.updatedAt = Date.now(); scheduleSave();
+}
+
+// ─── Milestone celebrations ───────────────────────────────────
+let _milestonesShown = new Set();
+let _milestoneTimer = null;
+function checkMilestones(total) {
+  if (!state.goal || state.goal <= 0) return;
+  const pct = (total / state.goal) * 100;
+  const hits = [[50,'🔥','Halfway there!',''],[75,'⚡','75% of goal!',''],[100,'🎯','Goal reached!','Amazing work!'],[150,'🚀','150% of goal!','Crushing it!']];
+  for (const [threshold, icon, msg, sub] of hits) {
+    if (pct >= threshold && !_milestonesShown.has(threshold)) {
+      _milestonesShown.add(threshold);
+      showMilestoneToast(icon, msg, sub || fmt(total)+' of '+fmt(state.goal)+' goal');
+      break;
+    }
+  }
+}
+function showMilestoneToast(icon, msg, sub) {
+  const t = document.getElementById('milestoneToast');
+  document.getElementById('milestoneIcon').textContent = icon;
+  document.getElementById('milestoneMsg').textContent = msg;
+  document.getElementById('milestoneSub').textContent = sub;
+  t.classList.add('show');
+  if (_milestoneTimer) clearTimeout(_milestoneTimer);
+  _milestoneTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── Quick repeat ─────────────────────────────────────────────
+let _lastSale = null;
+function updateRepeatBtn() {
+  const btn = document.getElementById('repeatBtn');
+  if (!_lastSale || pastEditShiftId !== null) { btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  document.getElementById('repeatBtnLabel').textContent =
+    'Repeat: '+_lastSale.product+' · '+fmtD(_lastSale.unitAmount||_lastSale.amount);
+}
+function quickRepeat() {
+  if (!_lastSale) return;
+  selectProduct(_lastSale.product);
+  document.getElementById('saleAmount').value = _lastSale.unitAmount || _lastSale.amount;
+  document.getElementById('saleGuests').value = _lastSale.guests || 1;
+  updateSalePreview();
+}
+
+// ─── End shift modal ──────────────────────────────────────────
+let _pendingEndEntry = null;
+function showEndShiftModal(entry, elMin) {
+  _pendingEndEntry = entry;
+  const goalPct = entry.goal>0 ? Math.round((entry.totalSales/entry.goal)*100) : null;
+  document.getElementById('endStatGrid').innerHTML = [
+    { v: fmtD(entry.totalSales), l: 'Total sales' },
+    { v: fmtD(entry.totalCommission), l: 'Commission ('+entry.hotelTier+')' },
+    { v: entry.txCount+' tickets', l: entry.saleCount+' transactions' },
+    { v: elMin+'m', l: 'Shift length' },
+    { v: entry.conv+'%', l: 'Conversion rate' },
+    { v: goalPct!=null ? goalPct+'% of goal' : 'No goal set', l: goalPct!=null?fmt(entry.goal)+' goal':'—' },
+  ].map(s=>`<div class="end-stat"><div class="end-stat-val">${s.v}</div><div class="end-stat-lbl">${s.l}</div></div>`).join('');
+  document.getElementById('endShiftNotes').value = state.notes || '';
+  document.getElementById('endShiftModal').style.display = 'flex';
+}
+async function confirmEndShift() {
+  if (!_pendingEndEntry) return;
+  _pendingEndEntry.notes = document.getElementById('endShiftNotes').value.trim();
+  document.getElementById('endShiftModal').style.display = 'none';
+  await addToHistory(_pendingEndEntry);
+  historyCache = null;
+  state.shiftOpen = false; state.updatedAt = Date.now();
+  document.getElementById('shiftBadge').textContent = '● Closed';
+  document.getElementById('shiftBadge').className = 'badge badge-closed';
+  document.getElementById('endShiftBtn').disabled = true;
+  _pendingEndEntry = null;
+  _milestonesShown.clear();
+  _lastSale = null; updateRepeatBtn();
+  lsSet(lsStateKey(), state); pushState();
+}
+
+// ─── Edit past sale ───────────────────────────────────────────
+let _editSaleShiftId = null;
+let _editSaleSaleIdx = null;
+let _editSaleHistory = null;
+function toggleShiftSales(sid) {
+  const el = document.getElementById('shcSales_'+sid);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+function openEditSaleModal(shiftId, saleIdx) {
+  const history = historyCache || [];
+  const shift = history.find(h => String(h.id) === String(shiftId));
+  if (!shift) return;
+  const sale = (shift.sales || [])[saleIdx];
+  if (!sale) return;
+  _editSaleShiftId = shiftId; _editSaleSaleIdx = saleIdx; _editSaleHistory = shift;
+  document.getElementById('editSaleTitle').textContent = sale.product;
+  document.getElementById('editSaleAmount').value = sale.unitAmount || sale.amount;
+  document.getElementById('editSaleGuests').value = sale.guests || 1;
+  document.getElementById('editSaleModal').style.display = 'flex';
+}
+function closeEditSaleModal() {
+  document.getElementById('editSaleModal').style.display = 'none';
+  _editSaleShiftId = null; _editSaleSaleIdx = null;
+}
+async function saveEditedSale() {
+  const history = historyCache || [];
+  const shift = history.find(h => String(h.id) === String(_editSaleShiftId));
+  if (!shift) return;
+  const sales = [...(shift.sales || [])];
+  const oldSale = sales[_editSaleSaleIdx];
+  const newAmt = parseFloat(document.getElementById('editSaleAmount').value);
+  const newGuests = parseInt(document.getElementById('editSaleGuests').value)||1;
+  if (!newAmt || newAmt <= 0) { alert('Enter a valid amount.'); return; }
+  const taxRate = state.taxRate ?? 6.5;
+  const inclTax = state.priceIncludesTax !== false;
+  const preTax = inclTax ? newAmt/(1+taxRate/100) : newAmt;
+  const commission = calcCommission(oldSale.product, preTax, shift.hotelTier || 'Premier');
+  sales[_editSaleSaleIdx] = { ...oldSale, amount: newAmt, unitAmount: newAmt, preTax: Math.round(preTax*100)/100, commission, guests: newGuests };
+  closeEditSaleModal();
+  try {
+    const result = await apiFetch('PUT', '/api/me/history/'+_editSaleShiftId, { ...shift, sales });
+    if (result) {
+      historyCache = historyCache.map(h => String(h.id) === String(_editSaleShiftId) ? result.entry : h);
+      lsSet(lsHistoryKey(), historyCache);
+      renderPastShifts();
+    }
+  } catch { alert('Failed to save — check connection.'); }
+}
+function deleteSaleFromShift(shiftId, saleIdx) {
+  if (!confirm('Remove this sale?')) return;
+  const history = historyCache || [];
+  const shift = history.find(h => String(h.id) === String(shiftId));
+  if (!shift) return;
+  const sales = (shift.sales || []).filter((_,i) => i !== saleIdx);
+  apiFetch('PUT', '/api/me/history/'+shiftId, { ...shift, sales }).then(result => {
+    if (result) {
+      historyCache = historyCache.map(h => String(h.id) === String(shiftId) ? result.entry : h);
+      lsSet(lsHistoryKey(), historyCache);
+      renderPastShifts();
+    }
+  }).catch(() => alert('Failed to save.'));
+}
+
+// ─── Insights ─────────────────────────────────────────────────
+let _insightsData = null;
+let _insightTab = 'products';
+async function renderInsights() {
+  if (!_insightsData) {
+    try { _insightsData = await apiGet('/api/insights'); } catch { return; }
+  }
+  if (_insightTab === 'products') renderTopProducts();
+  else renderHourly();
+}
+function switchInsightTab(tab, btn) {
+  _insightTab = tab;
+  document.querySelectorAll('.lb-subtab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('insightsProducts').style.display = tab==='products'?'':'none';
+  document.getElementById('insightsHourly').style.display   = tab==='hourly'?'':'none';
+  renderInsights();
+}
+function renderTopProducts() {
+  const el = document.getElementById('insightsProducts');
+  if (!_insightsData?.topProducts?.length) { el.innerHTML='<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">No sales data yet</div>'; return; }
+  const max = _insightsData.topProducts[0].revenue;
+  el.innerHTML = _insightsData.topProducts.map(p => `
+    <div class="top-prod-row">
+      <span class="top-prod-name" title="${p.product}">${p.product}</span>
+      <div class="top-prod-bar-wrap"><div class="top-prod-bar" style="width:${Math.round((p.revenue/max)*100)}%"></div></div>
+      <span class="top-prod-val">${fmt(p.revenue)}</span>
+    </div>`).join('');
+}
+function renderHourly() {
+  const el = document.getElementById('insightsHourly');
+  if (!_insightsData?.hourly) { el.innerHTML='<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">No data yet</div>'; return; }
+  const hours = _insightsData.hourly;
+  const maxCount = Math.max(...hours.map(h=>h.count), 1);
+  const peakHour = hours.indexOf(hours.reduce((a,h)=>h.count>a.count?h:a, hours[0]));
+  const label = h => h===0?'12a':h<12?h+'a':h===12?'12p':(h-12)+'p';
+  el.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:8px">Peak hour: <strong>${label(peakHour)}</strong> · based on all team sales</div>
+    <div class="hourly-row">${hours.map((h,i)=>`
+      <div class="hourly-bar-wrap">
+        <div class="hourly-bar" style="height:${Math.round((h.count/maxCount)*60)}px" title="${h.count} sales"></div>
+        <div class="hourly-lbl">${i%3===0?label(i):''}</div>
+      </div>`).join('')}
+    </div>`;
 }
 
 // ─── Past shift modal (log a retroactive shift) ───────────────
@@ -1640,10 +2015,11 @@ function psmSelectProduct(p) {
   psmSelectedProduct = p;
   document.getElementById('psmSelProduct').textContent = p;
   document.getElementById('psmPriceSection').style.display = '';
-  document.getElementById('psmAmount').value = '';
+  const price = PRODUCT_PRICES[p];
+  document.getElementById('psmAmount').value = price != null ? price : '';
   document.getElementById('psmGuests').value = '1';
-  document.getElementById('psmPreview').style.display = 'none';
-  setTimeout(()=>document.getElementById('psmAmount').focus(),50);
+  psmUpdatePreview();
+  if (price == null) setTimeout(()=>document.getElementById('psmAmount').focus(),50);
 }
 function psmClearProduct() {
   psmSelectedProduct = null;
@@ -1724,7 +2100,7 @@ function switchTab(id, el) {
   document.getElementById('tab-'+id).classList.add('active');
   el.classList.add('active');
   if (id==='past')        renderPastShifts();
-  if (id==='leaderboard') { renderLeaderboard(); renderWeeklyComm(); }
+  if (id==='leaderboard') { renderLeaderboard(); renderWeeklyComm(); _insightsData=null; renderInsights(); }
 }
 
 // ─── Sale actions ─────────────────────────────────────────────
@@ -1734,8 +2110,11 @@ function selectProduct(p) {
   document.getElementById('selProdCat').textContent = cat ? cat.name : '';
   document.getElementById('selProdName').textContent = p;
   document.getElementById('priceEntryCard').style.display = '';
-  document.getElementById('saleAmount').value = '';
-  setTimeout(() => document.getElementById('saleAmount').focus(), 50);
+  const price = PRODUCT_PRICES[p];
+  document.getElementById('saleAmount').value = price != null ? price : '';
+  document.getElementById('saleGuests').value = '1';
+  updateSalePreview();
+  if (price == null) setTimeout(() => document.getElementById('saleAmount').focus(), 50);
 }
 
 function clearProductSelection() {
@@ -1798,6 +2177,7 @@ async function logSale() {
   }
 
   state.sales.push(sale);
+  _lastSale = sale; updateRepeatBtn();
   document.getElementById('saleAmount').value='';
   document.getElementById('saleNote').value='';
   document.getElementById('saleGuests').value='1';
@@ -1807,6 +2187,7 @@ async function logSale() {
   state.updatedAt=Date.now();
   renderProductListItems();
   render(); scheduleSave();
+  checkMilestones(state.sales.reduce((a,s)=>a+s.amount,0));
 }
 function deleteSale(i) { if(confirm('Delete this sale?')){ state.sales.splice(i,1); state.updatedAt=Date.now(); render(); scheduleSave(); } }
 function addGuests(n) { state.guestsExtra+=n; state.updatedAt=Date.now(); render(); scheduleSave(); }
@@ -1852,7 +2233,7 @@ function updateOcc() {
   state.updatedAt=Date.now(); render(); scheduleSave();
 }
 
-async function endShift() {
+function endShift() {
   if (!state.shiftOpen) return;
   const total=state.sales.reduce((a,s)=>a+s.amount,0);
   const guestsSold=state.sales.reduce((a,s)=>a+s.guests,0);
@@ -1872,23 +2253,18 @@ async function endShift() {
     totalSales:total,txCount:guestsSold,saleCount:state.sales.length,goal:state.goal,
     occ:state.occ,occType:state.occType,totalGuests,guestsSold,conv,
     totalCommission,hotelTier:state.hotelTier,hotel:state.hotel||null,
-    topProduct,notes:state.notes,sales:state.sales
+    shiftType:state.shiftType||'A',
+    topProduct,notes:'',sales:state.sales
   };
-  await addToHistory(entry);
-  historyCache=null;
-  state.shiftOpen=false; state.updatedAt=Date.now();
-  document.getElementById('shiftBadge').textContent='● Closed';
-  document.getElementById('shiftBadge').className='badge badge-closed';
-  document.getElementById('endShiftBtn').disabled=true;
-  lsSet(lsStateKey(),state); pushState();
-  const el=Math.floor((shiftEnd-state.shiftStart)/60000);
-  alert(`Shift ended!\n\nTotal: ${fmt(total)}\nCommission: ${fmtD(totalCommission)} (${state.hotelTier})\nTickets sold: ${guestsSold}\nSales logged: ${state.sales.length}\nGoal: ${state.goal?Math.round((total/state.goal)*100)+'%':'N/A'}\nGuests: ${totalGuests}\nConversion: ${conv}%\nLength: ${el} min\n\nNice work, ${currentUser?.name||'team'}! 🎉`);
+  const elMin=Math.floor((shiftEnd-state.shiftStart)/60000);
+  showEndShiftModal(entry, elMin);
 }
 
 function resetAll() {
   if (!confirm('Start a new shift? Current data will be cleared.')) return;
-  const {goal,occ,occType,hotelTier,taxRate,priceIncludesTax}=state;
-  state={sales:[],guestsExtra:0,goal,occ,occType,hotelTier,taxRate,priceIncludesTax,selectedProduct:null,shiftStart:Date.now(),shiftOpen:true,notes:'',updatedAt:Date.now()};
+  const {goal,occ,occType,hotelTier,taxRate,priceIncludesTax,hotel,shiftType}=state;
+  state={sales:[],guestsExtra:0,goal,occ,occType,hotelTier,taxRate,priceIncludesTax,hotel,shiftType:shiftType||'A',selectedProduct:null,shiftStart:Date.now(),shiftOpen:true,notes:'',updatedAt:Date.now()};
+  _milestonesShown.clear(); _lastSale=null; updateRepeatBtn();
   selectedCategory=null;
   syncUIToState(); document.getElementById('shiftNotes').value='';
   if (prodChart){prodChart.destroy();prodChart=null;}
@@ -2087,6 +2463,69 @@ setInterval(updateTimer,1000);
     <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
       <button class="btn" style="flex:1" onclick="closePastShiftModal()">Cancel</button>
       <button class="btn btn-primary" style="flex:1" onclick="savePastShift()">Save shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- Milestone celebration toast -->
+<div class="milestone-toast" id="milestoneToast">
+  <span class="milestone-toast-icon" id="milestoneIcon"></span>
+  <div class="milestone-toast-msg" id="milestoneMsg"></div>
+  <div class="milestone-toast-sub" id="milestoneSub"></div>
+</div>
+
+<!-- Shift setup modal (shown after login) -->
+<div class="shift-setup-modal" id="shiftSetupModal">
+  <div class="shift-setup-inner">
+    <div class="shift-setup-title">Good to see you! 👋</div>
+    <div class="shift-setup-sub">Quick setup before your shift starts</div>
+    <div class="input-group">
+      <label>Your hotel today</label>
+      <select class="hotel-select" id="setupHotelSelect">
+        <option value="">— Select your hotel —</option>
+      </select>
+    </div>
+    <div class="input-group" style="margin-top:12px">
+      <label>Shift type</label>
+      <div class="shift-type-row">
+        <button class="shift-type-btn active" id="setupShiftTypeA" onclick="pickSetupShiftType('A')">A Shift</button>
+        <button class="shift-type-btn" id="setupShiftTypeB" onclick="pickSetupShiftType('B')">B Shift</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:20px;font-size:15px;padding:13px" onclick="saveShiftSetup()">
+      <i class="ti ti-player-play" style="margin-right:6px"></i>Start shift
+    </button>
+  </div>
+</div>
+
+<!-- End shift modal -->
+<div class="end-shift-modal" id="endShiftModal">
+  <div class="end-shift-inner">
+    <div class="end-shift-title">Shift complete 🎉</div>
+    <div class="end-stat-grid" id="endStatGrid"></div>
+    <div class="input-group" style="margin-bottom:16px">
+      <label>Shift notes <span style="font-weight:400;color:var(--text3)">optional</span></label>
+      <textarea id="endShiftNotes" rows="3" placeholder="Weather, team size, special events, anything worth remembering…" style="width:100%;font-size:13px;padding:10px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;resize:none"></textarea>
+    </div>
+    <button class="btn btn-primary" style="width:100%;font-size:15px;padding:13px" onclick="confirmEndShift()">Save & close shift</button>
+  </div>
+</div>
+
+<!-- Edit sale modal -->
+<div class="edit-sale-modal" id="editSaleModal" onclick="if(event.target===this)closeEditSaleModal()">
+  <div class="edit-sale-inner">
+    <div class="edit-sale-title" id="editSaleTitle">Edit sale</div>
+    <div class="input-group">
+      <label>Amount ($)</label>
+      <input type="number" id="editSaleAmount" min="0" step="0.01" inputmode="decimal" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+    </div>
+    <div class="input-group" style="margin-top:10px">
+      <label>Guests</label>
+      <input type="number" id="editSaleGuests" min="1" inputmode="numeric" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn" style="flex:1" onclick="closeEditSaleModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="saveEditedSale()">Save</button>
     </div>
   </div>
 </div>
