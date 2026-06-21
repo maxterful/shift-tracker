@@ -6,6 +6,7 @@
 <title>Shift Tracker</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -756,6 +757,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
     <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin:0">Hotel leaderboard</div>
+        <div class="period-tabs">
+          <button class="period-tab active" id="hlbTab-today" onclick="setHlbPeriod('today',this)">Today</button>
+          <button class="period-tab" id="hlbTab-week" onclick="setHlbPeriod('week',this)">This week</button>
+          <button class="period-tab" id="hlbTab-month" onclick="setHlbPeriod('month',this)">This month</button>
+          <button class="period-tab" id="hlbTab-alltime" onclick="setHlbPeriod('alltime',this)">All time</button>
+        </div>
+      </div>
+      <div id="hotelLeaderboardList" class="lb-list">
+        <div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>
+      </div>
+    </div>
+    <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div class="section-title" style="margin:0">Team insights</div>
         <div style="display:flex;gap:6px">
@@ -1136,6 +1151,7 @@ let state = {
 };
 let prodChart = null, timeChart = null;
 let historyCache = null;
+let _goalReached = false;
 
 function scheduleSave() {
   lsSet(lsStateKey(), state);
@@ -1564,6 +1580,17 @@ function render() {
   document.getElementById('convBar').style.width      = (conv||0)+'%';
   document.getElementById('histCount').textContent    = txCount+' ticket'+(txCount!==1?'s':'');
   document.getElementById('shiftDate').textContent    = new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric'});
+  // Confetti when goal is hit for the first time this shift
+  if (goal > 0 && total >= goal && state.shiftOpen && !_goalReached) {
+    _goalReached = true;
+    if (typeof confetti === 'function') {
+      confetti({ particleCount: 120, spread: 80, origin: { y: 0.55 } });
+      setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { x: 0.1, y: 0.6 } }), 300);
+      setTimeout(() => confetti({ particleCount: 60, spread: 100, origin: { x: 0.9, y: 0.6 } }), 500);
+    }
+  } else if (goal > 0 && total < goal) {
+    _goalReached = false; // reset if sales are deleted below goal
+  }
   renderProductListItems(); renderSaleList(); renderCharts(sales);
 }
 
@@ -1754,7 +1781,7 @@ async function renderLeaderboard() {
   const el = document.getElementById('leaderboardList');
   el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
   try {
-    const raw = await apiGet('/api/leaderboard?period=' + lbPeriod);
+    const raw = await apiGet('/api/leaderboard?period=' + lbPeriod + '&tz=' + new Date().getTimezoneOffset());
     const all = raw || [];
     // Always include self; others only if they have shifts
     const board = all.filter(r => r.shiftCount > 0 || r.user.id === currentUser?.id);
@@ -1779,7 +1806,7 @@ async function renderLeaderboard() {
         <div class="lb-avatar" style="background:${row.user.color}22;border:2px solid ${row.user.color}44">${row.user.emoji}</div>
         <div class="lb-info">
           <div class="lb-name">${row.user.name}${isMe?'<span class="you-tag">YOU</span>':''}</div>
-          <div class="lb-sub">${noShifts ? 'No shifts this period' : `${row.shiftCount} shift${row.shiftCount!==1?'s':''} · ${row.txCount} sale${row.txCount!==1?'s':''} · Avg ${fmt(row.avgPerShift)}`}</div>
+          <div class="lb-sub">${noShifts ? 'No shifts this period' : `${row.shiftCount} shift${row.shiftCount!==1?'s':''} · ${row.txCount} sale${row.txCount!==1?'s':''} · Avg ${fmt(row.avgPerShift)}`}${row.hotel && !noShifts ? `<span style="display:block;font-size:10px;color:var(--text3);margin-top:1px">🏨 ${row.hotel}</span>` : ''}</div>
         </div>
         <div class="lb-stats">
           <div class="lb-total">${noShifts ? '—' : fmt(row.totalSales)}</div>
@@ -1794,7 +1821,7 @@ async function renderLeaderboard() {
 
 function setLbPeriod(period, btn) {
   lbPeriod = period;
-  document.querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
+  btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderLeaderboard();
 }
@@ -1802,7 +1829,7 @@ function setLbPeriod(period, btn) {
 async function renderWeeklyComm() {
   const el = document.getElementById('weeklyCommList');
   try {
-    const board = await apiGet('/api/leaderboard?period=week');
+    const board = await apiGet('/api/leaderboard?period=week&tz=' + new Date().getTimezoneOffset());
     const sorted = [...(board || [])].sort((a,b) => b.totalCommission - a.totalCommission).filter(r => r.totalCommission > 0);
     if (!sorted.length) { el.innerHTML = '<div class="empty-state">No commission earned this week yet</div>'; return; }
     el.innerHTML = sorted.map((row, i) => {
@@ -1822,6 +1849,44 @@ async function renderWeeklyComm() {
     }).join('');
   } catch {
     el.innerHTML = '<div class="empty-state">Could not load</div>';
+  }
+}
+
+// ─── Hotel leaderboard ───────────────────────────────────────
+let hlbPeriod = 'today';
+const TIER_COLORS = { Premier: '#F59E0B', 'Non-Premier': '#9CA3AF', UPH: '#2563EB' };
+
+function setHlbPeriod(period, btn) {
+  hlbPeriod = period;
+  btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHotelLeaderboard();
+}
+
+async function renderHotelLeaderboard() {
+  const el = document.getElementById('hotelLeaderboardList');
+  if (!el) return;
+  el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
+  try {
+    const tz = new Date().getTimezoneOffset();
+    const board = await apiGet('/api/hotel-leaderboard?period=' + hlbPeriod + '&tz=' + tz);
+    if (!board?.length) { el.innerHTML = '<div class="empty-state">No hotel data for this period yet.</div>'; return; }
+    const medals = ['🥇','🥈','🥉'];
+    el.innerHTML = board.map((row, i) => {
+      const tierColor = TIER_COLORS[row.hotelTier] || 'var(--text3)';
+      return `<div class="lb-row" style="border-left-color:${medals[i] ? tierColor : 'transparent'}">
+        <div class="lb-rank">${medals[i] ?? (i+1)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700">${row.hotel}</div>
+          <div style="font-size:11px;color:var(--text3)">${row.shiftCount} shift${row.shiftCount!==1?'s':''} · ${row.txCount} ticket${row.txCount!==1?'s':''} · Top: ${row.topUser||'—'}
+            ${row.hotelTier ? `<span style="margin-left:5px;padding:1px 5px;border-radius:99px;background:${tierColor}22;color:${tierColor};font-size:10px;font-weight:700">${row.hotelTier}</span>` : ''}
+          </div>
+        </div>
+        <div style="font-size:17px;font-weight:700">$${Math.round(row.totalSales).toLocaleString()}</div>
+      </div>`;
+    }).join('');
+  } catch {
+    el.innerHTML = '<div class="empty-state">Could not load hotel data.</div>';
   }
 }
 
@@ -2283,7 +2348,7 @@ function switchTab(id, el) {
   document.getElementById('tab-'+id).classList.add('active');
   el.classList.add('active');
   if (id==='past')        renderPastShifts();
-  if (id==='leaderboard') { renderLeaderboard(); renderWeeklyComm(); _insightsData=null; renderInsights(); }
+  if (id==='leaderboard') { renderLeaderboard(); renderWeeklyComm(); renderHotelLeaderboard(); _insightsData=null; renderInsights(); }
 }
 
 // ─── Sale actions ─────────────────────────────────────────────
@@ -2459,7 +2524,7 @@ function resetAll() {
   if (!confirm('Start a new shift? Current data will be cleared.')) return;
   const {goal,occ,occType,hotelTier,taxRate,priceIncludesTax,hotel,shiftType}=state;
   state={sales:[],guestsExtra:0,goal,occ,occType,hotelTier,taxRate,priceIncludesTax,hotel,shiftType:shiftType||'A',selectedProduct:null,shiftStart:Date.now(),shiftOpen:true,notes:'',updatedAt:Date.now()};
-  _milestonesShown.clear(); _lastSale=null; updateRepeatBtn();
+  _milestonesShown.clear(); _lastSale=null; _goalReached=false; updateRepeatBtn();
   selectedCategory=null;
   syncUIToState(); document.getElementById('shiftNotes').value='';
   if (prodChart){prodChart.destroy();prodChart=null;}

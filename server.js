@@ -322,14 +322,22 @@ app.get('/api/insights', (_req, res) => {
   res.json({ topProducts, hourly });
 });
 
+function localPeriodBounds(tzOffset) {
+  // tzOffset = minutes behind UTC (e.g. 240 for EDT)
+  const tzMs   = (tzOffset || 0) * 60000;
+  const nowLocal = new Date(Date.now() - tzMs);
+  nowLocal.setUTCHours(0, 0, 0, 0);
+  const dayStart = nowLocal.getTime() + tzMs;               // local midnight in UTC
+  const wkStart  = dayStart - nowLocal.getUTCDay() * 86400000;
+  const moStart  = dayStart - (nowLocal.getUTCDate() - 1) * 86400000;
+  return { dayStart, wkStart, moStart };
+}
+
 // ── Leaderboard ───────────────────────────────────────────
 app.get('/api/leaderboard', (_req, res) => {
-  const { period = 'alltime' } = _req.query;
+  const { period = 'alltime', tz = '0' } = _req.query;
   const users    = read(path.join(DATA, 'users.json'), []);
-  const now      = new Date();
-  const dayStart = new Date(now).setHours(0, 0, 0, 0);
-  const wkStart  = dayStart - now.getDay() * 86400000;
-  const moStart  = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const { dayStart, wkStart, moStart } = localPeriodBounds(parseInt(tz, 10));
 
   const board = users.map(user => {
     const hist = read(path.join(DATA, 'users', user.id, 'history.json'), []);
@@ -348,13 +356,52 @@ app.get('/api/leaderboard', (_req, res) => {
     const bestSale        = rows.reduce((a, h) =>
       Math.max(a, (h.sales || []).reduce((b, s) => Math.max(b, s.amount || 0), 0)), 0);
     const conv = totalGuests > 0 ? Math.round((guestsSold / totalGuests) * 100) : null;
+    // Most recent shift hotel for the period (for display on leaderboard)
+    const mostRecent = rows.length ? rows.reduce((a, h) => (h.shiftEnd||0) > (a.shiftEnd||0) ? h : a, rows[0]) : null;
     return {
       user: safeUser(user), shiftCount: rows.length,
       totalSales, totalCommission, txCount, totalGuests, guestsSold, conv,
       bestShift, bestSale,
-      avgPerShift: rows.length ? Math.round(totalSales / rows.length) : 0
+      avgPerShift: rows.length ? Math.round(totalSales / rows.length) : 0,
+      hotel: mostRecent?.hotel || null,
+      hotelTier: mostRecent?.hotelTier || null,
     };
   }).sort((a, b) => b.totalSales - a.totalSales);
+
+  res.json(board);
+});
+
+// ── Hotel leaderboard ────────────────────────────────────
+app.get('/api/hotel-leaderboard', (_req, res) => {
+  const { period = 'today', tz = '0' } = _req.query;
+  const users    = read(path.join(DATA, 'users.json'), []);
+  const { dayStart, wkStart, moStart } = localPeriodBounds(parseInt(tz, 10));
+
+  const hotels = {};
+  users.forEach(user => {
+    read(path.join(DATA, 'users', user.id, 'history.json'), [])
+      .filter(h => {
+        if (period === 'today') return (h.shiftEnd || 0) >= dayStart;
+        if (period === 'week')  return (h.shiftEnd || 0) >= wkStart;
+        if (period === 'month') return (h.shiftEnd || 0) >= moStart;
+        return true;
+      })
+      .forEach(h => {
+        if (!h.hotel) return;
+        if (!hotels[h.hotel]) hotels[h.hotel] = { hotel: h.hotel, hotelTier: h.hotelTier || null, totalSales: 0, shiftCount: 0, txCount: 0, topUser: null, topUserSales: 0 };
+        hotels[h.hotel].totalSales  += h.totalSales || 0;
+        hotels[h.hotel].shiftCount  += 1;
+        hotels[h.hotel].txCount     += h.txCount || 0;
+        if ((h.totalSales || 0) > hotels[h.hotel].topUserSales) {
+          hotels[h.hotel].topUserSales = h.totalSales || 0;
+          hotels[h.hotel].topUser = user.name;
+        }
+      });
+  });
+
+  const board = Object.values(hotels)
+    .map(h => ({ ...h, totalSales: Math.round(h.totalSales * 100) / 100 }))
+    .sort((a, b) => b.totalSales - a.totalSales);
 
   res.json(board);
 });
