@@ -871,7 +871,7 @@ const PRODUCT_CATEGORIES = [
       { label: '2-Day Base', products: ['USF/IOA 2D Base AD', 'USF/IOA 2D Base CH'] },
       { label: '1-Day Park-to-Park', products: ['USF/IOA 1D PTP AD', 'USF/IOA 1D PTP CH'] },
       { label: '2-Day Park-to-Park', products: ['USF/IOA 2D PTP AD', 'USF/IOA 2D PTP CH'] },
-      { label: 'Conversions', products: ['1D USF/IOA BASE CONV <2PM AD', '1D USF/IOA BASE CONV <4PM AD', '1D USF/IOA PTP CONV <2PM AD', '1D USF/IOA PTP CONV <4PM AD'] }
+      { label: 'Conventions', products: ['1D USF/IOA BASE CONV <2PM AD', '1D USF/IOA BASE CONV <4PM AD', '1D USF/IOA PTP CONV <2PM AD', '1D USF/IOA PTP CONV <4PM AD'] }
     ],
     get products() { return this.subgroups.flatMap(s => s.products); }
   },
@@ -1054,10 +1054,10 @@ function commTypeFor(product, tier) {
       product.includes('PREMIUM SEATING') || product.includes('FREESTYLE') ||
       product.includes('DARKMOOR') || product.includes('BREAKFAST') ||
       product.includes('CHARACTER DINING') || product.includes('HHN')) return 'ancillary';
-  // 1D PTP: on-site hotels pay $0 commission; only UPH gets the admission rate
-  const is1dPtp = product === 'USF/IOA 1D PTP AD' || product === 'USF/IOA 1D PTP CH' ||
-                  product === 'FL USF/IOA 1D PTP AD' || product === 'FL USF/IOA 1D PTP CH';
-  if (is1dPtp && tier !== 'UPH') return 'none';
+  // 1D Base tickets (USF/IOA only, not PTP) earn no commission
+  const is1dBase = product === 'USF/IOA 1D Base AD' || product === 'USF/IOA 1D Base CH' ||
+                   product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH';
+  if (is1dBase) return 'none';
   return 'admission';
 }
 function commRateFor(product, tier) {
@@ -1138,11 +1138,15 @@ async function getHistory() {
   if (historyCache !== null) return historyCache;
   if (serverOk) {
     try {
-      historyCache = await apiGet('/api/me/history');
-      lsSet(lsHistoryKey(), historyCache);
-      return historyCache;
+      const data = await apiGet('/api/me/history');
+      if (data !== null) {
+        historyCache = data;
+        lsSet(lsHistoryKey(), historyCache);
+        return historyCache;
+      }
     } catch {}
   }
+  // Server offline or returned null (session expired) — use local cache
   historyCache = lsGet(lsHistoryKey(), []);
   return historyCache;
 }
@@ -1843,7 +1847,8 @@ let _editSaleHistory = null;
 function toggleShiftSales(sid) {
   const el = document.getElementById('shcSales_'+sid);
   if (!el) return;
-  el.style.display = el.style.display === 'none' ? '' : 'none';
+  const hidden = window.getComputedStyle(el).display === 'none';
+  el.style.display = hidden ? 'block' : 'none';
 }
 function openEditSaleModal(shiftId, saleIdx) {
   const history = historyCache || [];
