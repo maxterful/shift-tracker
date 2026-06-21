@@ -1573,6 +1573,8 @@ function openPastShiftModal() {
   document.getElementById('psmStartTime').value = '09:00';
   document.getElementById('psmEndTime').value = now.toTimeString().slice(0,5);
   document.getElementById('psmTier').value = state.hotelTier || 'Premier';
+  document.getElementById('psmGoal').value = '';
+  document.getElementById('psmOcc').value = '';
   psmRenderSales();
   psmRenderCatPills();
   document.getElementById('psmProdSection').style.display = 'none';
@@ -1701,7 +1703,9 @@ async function savePastShift() {
     duration: endDt.getTime()-startDt.getTime(),
     totalSales: Math.round(total*100)/100, totalCommission,
     txCount: guestsSold, saleCount: psmSales.length,
-    goal: state.goal, occ: state.occ, occType: state.occType,
+    goal: parseFloat(document.getElementById('psmGoal').value)||0,
+    occ: parseFloat(document.getElementById('psmOcc').value)||null,
+    occType: state.occType,
     totalGuests: guestsSold, guestsSold, conv: 0,
     hotelTier: tier, hotel: state.hotel||null,
     topProduct: Object.keys(pt).sort((a,b)=>pt[b]-pt[a])[0]||null,
@@ -2029,7 +2033,7 @@ setInterval(updateTimer,1000);
         </select>
       </div>
     </div>
-    <div class="input-row" style="margin-bottom:16px">
+    <div class="input-row" style="margin-bottom:12px">
       <div class="input-group" style="margin-bottom:0">
         <label>Shift start time</label>
         <input type="time" id="psmStartTime" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
@@ -2037,6 +2041,16 @@ setInterval(updateTimer,1000);
       <div class="input-group" style="margin-bottom:0">
         <label>Shift end time</label>
         <input type="time" id="psmEndTime" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+      </div>
+    </div>
+    <div class="input-row" style="margin-bottom:16px">
+      <div class="input-group" style="margin-bottom:0">
+        <label>Sales goal ($) <span style="font-weight:400;color:var(--text3)">optional</span></label>
+        <input type="number" id="psmGoal" placeholder="e.g. 2000" min="0" inputmode="decimal" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+      </div>
+      <div class="input-group" style="margin-bottom:0">
+        <label>Occupancy % <span style="font-weight:400;color:var(--text3)">optional</span></label>
+        <input type="number" id="psmOcc" placeholder="e.g. 80" min="0" max="100" inputmode="decimal" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
       </div>
     </div>
     <div id="psmSalesList" style="margin-bottom:12px"></div>
