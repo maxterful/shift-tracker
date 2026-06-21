@@ -535,6 +535,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <span class="badge badge-open" id="shiftBadge">● Open</span>
       <button class="btn btn-danger" id="endShiftBtn" onclick="endShift()">End shift</button>
       <button class="btn" onclick="resetAll()">New shift</button>
+      <button class="btn" onclick="logOut()" title="Log out" style="padding:0 10px;font-size:18px;line-height:1">⏻</button>
     </div>
   </div>
 
@@ -858,9 +859,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="card">
       <div class="section-title">Account</div>
-      <button class="btn btn-danger" onclick="switchUser()">
-        <i class="ti ti-logout" style="margin-right:6px"></i>Switch user / log out
-      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1" onclick="switchUser()">
+          <i class="ti ti-switch-horizontal" style="margin-right:6px"></i>Switch user
+        </button>
+        <button class="btn btn-danger" style="flex:1" onclick="logOut()">
+          <i class="ti ti-logout" style="margin-right:6px"></i>Log out
+        </button>
+      </div>
     </div>
     <div class="card" id="claimAdminCard">
       <div class="section-title">Become admin</div>
@@ -1482,12 +1488,23 @@ async function enterApp(freshLogin = false) {
   if (freshLogin) openShiftSetupModal();
 }
 
+async function logOut() {
+  if (!confirm('Log out?')) return;
+  try { await apiPost('/api/logout'); } catch {}
+  clearSession();
+  historyCache = null;
+  state = { sales:[], guestsExtra:0, goal:0, occ:null, occType:'Hotel', hotelTier:'Premier', taxRate:6.5, priceIncludesTax:true, selectedProduct:null, shiftStart:Date.now(), shiftOpen:true, notes:'', shiftType:'A', hotel:null, commGoal:0, updatedAt:0 };
+  selectedCategory = null;
+  if (prodChart) { prodChart.destroy(); prodChart = null; }
+  if (timeChart) { timeChart.destroy(); timeChart = null; }
+  showLoginScreen();
+}
 async function switchUser() {
   if (!confirm('Switch user? Your current shift will be saved.')) return;
   try { await apiPost('/api/logout'); } catch {}
   clearSession();
   historyCache = null;
-  state = { sales:[], guestsExtra:0, goal:0, occ:null, occType:'Hotel', hotelTier:'Premier', taxRate:6.5, priceIncludesTax:true, selectedProduct:null, shiftStart:Date.now(), shiftOpen:true, notes:'', shiftType:'A', hotel:null, updatedAt:0 };
+  state = { sales:[], guestsExtra:0, goal:0, occ:null, occType:'Hotel', hotelTier:'Premier', taxRate:6.5, priceIncludesTax:true, selectedProduct:null, shiftStart:Date.now(), shiftOpen:true, notes:'', shiftType:'A', hotel:null, commGoal:0, updatedAt:0 };
   selectedCategory = null;
   if (prodChart) { prodChart.destroy(); prodChart = null; }
   if (timeChart) { timeChart.destroy(); timeChart = null; }
