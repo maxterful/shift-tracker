@@ -430,31 +430,31 @@ const WX_CODE = code => {
 app.get('/api/park-info', async (_req, res) => {
   if (_parkCache && Date.now() - _parkCacheTs < 30 * 60 * 1000)
     return res.json(_parkCache);
-  try {
-    const [wx, dest] = await Promise.all([
-      httpGet('https://api.open-meteo.com/v1/forecast?latitude=28.5383&longitude=-81.3792&current=temperature_2m,apparent_temperature,weather_code&temperature_unit=fahrenheit&timezone=America%2FNew_York'),
-      httpGet('https://api.themeparks.wiki/v1/destination/universalorlando'),
-    ]);
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-    const parks = (dest.parks || []);
-    const schedules = await Promise.all(parks.map(p =>
-      httpGet(`https://api.themeparks.wiki/v1/entity/${p.id}/schedule`).catch(() => null)
-    ));
-    const fmt = t => t ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : null;
-    const parkHours = parks.map((p, i) => {
-      const op = (schedules[i]?.schedule || []).find(s => s.date === today && s.type === 'OPERATING');
-      return { name: p.name, open: fmt(op?.openingTime), close: fmt(op?.closingTime) };
-    });
-    _parkCache = {
-      weather: { temp: Math.round(wx.current.temperature_2m), feels: Math.round(wx.current.apparent_temperature), icon: WX_CODE(wx.current.weather_code) },
-      parkHours,
-      fetchedAt: Date.now(),
-    };
-    _parkCacheTs = Date.now();
-    res.json(_parkCache);
-  } catch(e) {
-    res.status(502).json({ error: String(e.message) });
+  const fmtTime = t => t ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : null;
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  const UOR_PARKS = [
+    { id: 'eb3f4560-2383-4a36-9152-6b3e5ed6bc57', name: 'Universal Studios Florida' },
+    { id: '267615cc-8943-4c2a-ae2c-5da728ca591f', name: 'Islands of Adventure' },
+    { id: '12dbb85b-265f-44e6-bccf-f1faa17211fc', name: 'Epic Universe' },
+    { id: 'fe78a026-b91b-470c-b906-9d2266b692da', name: 'Volcano Bay' },
+  ];
+  const [wxResult, ...schedResults] = await Promise.allSettled([
+    httpGet('https://api.open-meteo.com/v1/forecast?latitude=28.5383&longitude=-81.3792&current=temperature_2m,apparent_temperature,weather_code&temperature_unit=fahrenheit&timezone=America%2FNew_York'),
+    ...UOR_PARKS.map(p => httpGet(`https://api.themeparks.wiki/v1/entity/${p.id}/schedule`)),
+  ]);
+  let weather = null;
+  if (wxResult.status === 'fulfilled') {
+    const wx = wxResult.value;
+    weather = { temp: Math.round(wx.current.temperature_2m), feels: Math.round(wx.current.apparent_temperature), icon: WX_CODE(wx.current.weather_code) };
   }
+  const parkHours = UOR_PARKS.map((p, i) => {
+    const sched = schedResults[i].status === 'fulfilled' ? schedResults[i].value : null;
+    const op = (sched?.schedule || []).find(s => s.date === today && s.type === 'OPERATING');
+    return { name: p.name, open: fmtTime(op?.openingTime), close: fmtTime(op?.closingTime) };
+  });
+  _parkCache = { weather, parkHours, fetchedAt: Date.now() };
+  _parkCacheTs = Date.now();
+  res.json(_parkCache);
 });
 
 // ── Admin announcements ────────────────────────────────────
