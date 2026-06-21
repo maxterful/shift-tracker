@@ -349,6 +349,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* Quick repeat */
 .repeat-btn { width:100%; margin-top:6px; background:var(--bg2); border:1px solid var(--border2); color:var(--text2); font-size:13px; }
 .repeat-btn:active { opacity:0.7; }
+/* Tax toggle active state */
+.tax-toggle-pretax { background:var(--amber-dark,#92400e)!important; border-color:var(--amber-mid,#F59E0B)!important; color:var(--amber-mid,#F59E0B)!important; }
 /* Top products bar */
 .top-prod-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:0.5px solid var(--border2); font-size:13px; }
 .top-prod-row:last-child { border-bottom:none; }
@@ -580,7 +582,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="past-edit-banner" id="pastEditBanner">
       <i class="ti ti-pencil"></i>
       <span class="past-edit-banner-text" id="pastEditBannerText">Adding to past shift</span>
+      <button class="btn btn-sm" id="pastEditTaxToggle" onclick="togglePastEditTax()" title="Toggle tax mode">Inc. tax</button>
       <button class="btn btn-sm" onclick="exitPastEditMode()">Done</button>
+    </div>
+    <div id="pastEditCart" style="display:none;margin:0 0 6px;background:var(--bg2);border-radius:var(--radius);padding:8px 12px;font-size:12px;border:1px solid var(--border2)">
+      <div style="font-weight:700;color:var(--text2);margin-bottom:4px" id="pastEditCartTitle">Cart</div>
+      <div id="pastEditCartItems"></div>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%" onclick="submitPastEditCart()">Save all to shift</button>
     </div>
     <div class="card" id="catCard">
       <div class="section-title">Step 1 — Select category</div>
@@ -1935,6 +1943,57 @@ function renderHourly() {
     </div>`;
 }
 
+// ─── Tax mode toggles (past-edit inline + PSM) ───────────────
+let pastEditPreTax = false; // false = inc. tax (default), true = pre-tax input
+function togglePastEditTax() {
+  pastEditPreTax = !pastEditPreTax;
+  const btn = document.getElementById('pastEditTaxToggle');
+  btn.textContent = pastEditPreTax ? 'Pre-tax' : 'Inc. tax';
+  btn.classList.toggle('tax-toggle-pretax', pastEditPreTax);
+  updateSalePreview();
+}
+
+let psmPreTax = false;
+function togglePsmTax() {
+  psmPreTax = !psmPreTax;
+  const btn = document.getElementById('psmTaxToggle');
+  btn.textContent = psmPreTax ? 'Pre-tax' : 'Inc. tax';
+  btn.classList.toggle('tax-toggle-pretax', psmPreTax);
+  document.getElementById('psmAmountLabel').textContent = psmPreTax ? 'Pre-tax amount ($)' : 'Amount ($)';
+  psmUpdatePreview();
+}
+
+// ─── Inline past-edit cart ────────────────────────────────────
+let pastEditCart = [];
+function renderPastEditCart() {
+  const cart = pastEditCart;
+  const el = document.getElementById('pastEditCartItems');
+  const wrap = document.getElementById('pastEditCart');
+  if (!cart.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  document.getElementById('pastEditCartTitle').textContent =
+    `Cart — ${cart.length} item${cart.length!==1?'s':''} · ${fmtD(cart.reduce((a,s)=>a+s.amount,0))} total`;
+  el.innerHTML = cart.map((s,i) => `<div style="display:flex;justify-content:space-between;padding:2px 0">
+    <span style="color:var(--text2)">${s.product}${s.guests>1?' ×'+s.guests:''}</span>
+    <span>${fmtD(s.amount)} <button onclick="pastEditCart.splice(${i},1);renderPastEditCart()" style="background:none;border:none;color:var(--red-mid,#ef4444);cursor:pointer;font-size:11px;padding:0 0 0 4px">✕</button></span>
+  </div>`).join('');
+}
+async function submitPastEditCart() {
+  if (!pastEditCart.length || pastEditShiftId === null) return;
+  const count = pastEditCart.length;
+  try {
+    for (const sale of pastEditCart) {
+      await apiPatch('/api/me/history/' + pastEditShiftId, sale);
+    }
+    pastEditCart = [];
+    historyCache = null;
+    renderPastEditCart();
+    const txt = document.getElementById('pastEditBannerText');
+    txt.textContent = `✓ ${count} sale${count!==1?'s':''} saved to ${pastEditShiftDate}`;
+    setTimeout(() => { txt.textContent = 'Adding sales to: ' + pastEditShiftDate; }, 1800);
+  } catch { alert('Failed to save — check connection.'); }
+}
+
 // ─── Past shift modal (log a retroactive shift) ───────────────
 let psmSales = [];
 let psmSelectedCat = null;
@@ -1960,6 +2019,10 @@ function openPastShiftModal() {
 function closePastShiftModal() {
   document.getElementById('pastShiftModal').style.display = 'none';
   psmSales = []; psmSelectedCat = null; psmSelectedProduct = null;
+  psmPreTax = false;
+  const btn = document.getElementById('psmTaxToggle');
+  if (btn) { btn.textContent = 'Inc. tax'; btn.classList.remove('tax-toggle-pretax'); }
+  document.getElementById('psmAmountLabel').textContent = 'Amount ($)';
 }
 function psmRenderSales() {
   const el = document.getElementById('psmSalesList');
@@ -2033,13 +2096,13 @@ function psmUpdatePreview() {
   if (!unitAmt||!psmSelectedProduct) { el.style.display='none'; return; }
   const amt = unitAmt*guests;
   const taxRate = state.taxRate??6.5;
-  const inclTax = state.priceIncludesTax!==false;
+  const inclTax = !psmPreTax;
   const preTax = inclTax?amt/(1+taxRate/100):amt;
   const taxAmt = inclTax?amt-preTax:amt*taxRate/100;
   const comm = calcCommission(psmSelectedProduct,preTax,tier);
   el.style.display='';
   document.getElementById('psmPreviewPre').textContent = fmtD(preTax)+(guests>1?' ('+guests+'×)':'');
-  document.getElementById('psmPreviewTax').textContent = fmtD(taxAmt);
+  document.getElementById('psmPreviewTax').textContent = fmtD(Math.round(taxAmt*100)/100);
   document.getElementById('psmPreviewComm').textContent = fmtD(comm);
 }
 function psmAddSale() {
@@ -2049,11 +2112,12 @@ function psmAddSale() {
   const amt = Math.round(unitAmt*guests*100)/100;
   const tier = document.getElementById('psmTier').value;
   const taxRate = state.taxRate??6.5;
-  const inclTax = state.priceIncludesTax!==false;
+  const inclTax = !psmPreTax;
   const preTax = inclTax?amt/(1+taxRate/100):amt;
   const taxAmt = Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
+  const totalAmt = inclTax?amt:Math.round((amt+taxAmt)*100)/100;
   const commission = calcCommission(psmSelectedProduct,preTax,tier);
-  psmSales.push({product:psmSelectedProduct,amount:amt,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note:'',time:nowStr(),ts:Date.now()});
+  psmSales.push({product:psmSelectedProduct,amount:totalAmt,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note:'',time:nowStr(),ts:Date.now()});
   psmRenderSales();
   psmClearProduct();
   document.getElementById('psmPriceSection').style.display='none';
@@ -2135,7 +2199,16 @@ function enterPastEditMode(id, date) {
   clearCategorySelection();
   switchTab('log', document.getElementById('tab-btn-log'));
 }
-function exitPastEditMode() {
+async function exitPastEditMode() {
+  // Auto-submit any unsaved cart items
+  if (pastEditCart.length && pastEditShiftId !== null) {
+    await submitPastEditCart();
+  }
+  pastEditCart = [];
+  pastEditPreTax = false;
+  const taxBtn = document.getElementById('pastEditTaxToggle');
+  if (taxBtn) { taxBtn.textContent = 'Inc. tax'; taxBtn.classList.remove('tax-toggle-pretax'); }
+  document.getElementById('pastEditCart').style.display = 'none';
   pastEditShiftId = null; pastEditShiftDate = '';
   document.getElementById('pastEditBanner').style.display = 'none';
   clearCategorySelection();
@@ -2152,27 +2225,27 @@ async function logSale() {
   const note=document.getElementById('saleNote').value.trim();
   const tier=state.hotelTier||'Premier';
   const taxRate=state.taxRate??6.5;
-  const inclTax=state.priceIncludesTax!==false;
+  // In past-edit mode use local toggle; otherwise use global setting
+  const inclTax = pastEditShiftId!==null ? !pastEditPreTax : state.priceIncludesTax!==false;
   const preTax=inclTax ? amt/(1+taxRate/100) : amt;
   const taxAmt=Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
   const commission=calcCommission(state.selectedProduct,preTax,tier);
-  const sale={product:state.selectedProduct,amount:amt,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now()};
+  const sale={product:state.selectedProduct,amount:inclTax?amt:Math.round((amt+taxAmt)*100)/100,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now()};
 
   if (pastEditShiftId !== null) {
-    try {
-      await apiPatch('/api/me/history/' + pastEditShiftId, sale);
-      historyCache = null;
-      document.getElementById('saleAmount').value='';
-      document.getElementById('saleNote').value='';
-      document.getElementById('saleGuests').value='1';
-      document.getElementById('salePreview').style.display='none';
-      document.getElementById('priceEntryCard').style.display='none';
-      state.selectedProduct=null;
-      renderCategoryPills(); renderProductListItems();
-      const txt = document.getElementById('pastEditBannerText');
-      txt.textContent = '✓ Sale added to ' + pastEditShiftDate;
-      setTimeout(()=>{ txt.textContent = 'Adding sales to: ' + pastEditShiftDate; }, 1800);
-    } catch { alert('Failed to save — check connection.'); }
+    // Add to local cart, don't submit yet
+    pastEditCart.push(sale);
+    renderPastEditCart();
+    document.getElementById('saleAmount').value='';
+    document.getElementById('saleNote').value='';
+    document.getElementById('saleGuests').value='1';
+    document.getElementById('salePreview').style.display='none';
+    document.getElementById('priceEntryCard').style.display='none';
+    state.selectedProduct=null;
+    renderCategoryPills(); renderProductListItems();
+    const txt = document.getElementById('pastEditBannerText');
+    txt.textContent = `Added to cart (${pastEditCart.length})`;
+    setTimeout(()=>{ txt.textContent = 'Adding sales to: ' + pastEditShiftDate; }, 1500);
     return;
   }
 
@@ -2216,14 +2289,16 @@ function updateSalePreview() {
   const amt=unitAmt*guests;
   const tier=state.hotelTier||'Premier';
   const taxRate=state.taxRate??6.5;
-  const inclTax=state.priceIncludesTax!==false;
+  // In past-edit mode, respect the local pre-tax toggle; otherwise use global setting
+  const inclTax = pastEditShiftId!==null ? !pastEditPreTax : state.priceIncludesTax!==false;
   const preTax=inclTax?amt/(1+taxRate/100):amt;
   const taxAmt=inclTax?amt-preTax:amt*taxRate/100;
   const commission=calcCommission(state.selectedProduct,preTax,tier);
   const rate=commRateFor(state.selectedProduct,tier);
   el.style.display='';
-  document.getElementById('previewPreTax').textContent=fmtD(preTax)+(guests>1?' ('+guests+'×'+fmtD(unitAmt/(1+taxRate/100))+')':'');
-  document.getElementById('previewTax').textContent=fmtD(taxAmt);
+  const unitPre=inclTax?unitAmt/(1+taxRate/100):unitAmt;
+  document.getElementById('previewPreTax').textContent=fmtD(preTax)+(guests>1?' ('+guests+'×'+fmtD(unitPre)+')':'');
+  document.getElementById('previewTax').textContent=fmtD(Math.round(taxAmt*100)/100);
   document.getElementById('previewComm').textContent=fmtD(commission);
   document.getElementById('previewRate').textContent=(rate*100).toFixed(2)+'%';
 }
@@ -2438,10 +2513,13 @@ setInterval(updateTimer,1000);
         <div class="prod-list" id="psmProdList"></div>
       </div>
       <div id="psmPriceSection" style="display:none;margin-top:10px">
-        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px" id="psmSelProduct"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;color:var(--text2)" id="psmSelProduct"></div>
+          <button class="btn btn-sm" id="psmTaxToggle" onclick="togglePsmTax()" style="font-size:11px">Inc. tax</button>
+        </div>
         <div class="input-row">
           <div class="input-group" style="margin-bottom:0">
-            <label>Amount ($)</label>
+            <label id="psmAmountLabel">Amount ($)</label>
             <input type="number" id="psmAmount" placeholder="0.00" min="0" step="0.01" inputmode="decimal" oninput="psmUpdatePreview()">
           </div>
           <div class="input-group" style="margin-bottom:0">
