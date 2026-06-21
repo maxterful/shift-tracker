@@ -1319,7 +1319,7 @@ function render() {
   const goalPct     = goal > 0 ? (total/goal)*100 : null;
   const conv        = totalGuests > 0 ? Math.round((guestsSold/totalGuests)*100) : null;
 
-  document.getElementById('totalSales').textContent  = fmt(total);
+  document.getElementById('totalSales').textContent  = fmtD(total);
   document.getElementById('salesSub').textContent    = txCount+' ticket'+(txCount!==1?'s':'')+' · '+saleCount+' sale'+(saleCount!==1?'s':'');
   document.getElementById('totalCommission').textContent = txCount ? 'Commission: '+fmtD(totalComm) : '';
   if (goalPct !== null) {
