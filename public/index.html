@@ -2183,14 +2183,33 @@ let psmSales = [];
 let psmSelectedCat = null;
 let psmSelectedProduct = null;
 
+function buildPsmHotelSelect() {
+  const sel = document.getElementById('psmHotel');
+  const labels = { Premier: 'On-Site · Premier', 'Non-Premier': 'On-Site · Non-Premier', UPH: 'Partner Hotels (UPH)' };
+  sel.innerHTML = '<option value="">— Select hotel —</option>';
+  for (const [tier, hotels] of Object.entries(HOTEL_TIERS)) {
+    const og = document.createElement('optgroup'); og.label = labels[tier];
+    hotels.forEach(h => { const o = document.createElement('option'); o.value = o.textContent = h; og.appendChild(o); });
+    sel.appendChild(og);
+  }
+}
+function psmHotelChanged() {
+  const hotel = document.getElementById('psmHotel').value;
+  if (hotel) {
+    const tier = tierForHotel(hotel);
+    document.getElementById('psmTier').value = tier;
+  }
+}
 function openPastShiftModal() {
   psmSales = []; psmSelectedCat = null; psmSelectedProduct = null;
-  // Default to today's date and a plausible shift window
   const now = new Date();
   document.getElementById('psmDate').value = now.toISOString().slice(0,10);
   document.getElementById('psmStartTime').value = '09:00';
   document.getElementById('psmEndTime').value = now.toTimeString().slice(0,5);
-  document.getElementById('psmTier').value = state.hotelTier || 'Premier';
+  buildPsmHotelSelect();
+  document.getElementById('psmHotel').value = '';
+  document.getElementById('psmTier').value = 'Premier';
+  document.getElementById('psmShiftType').value = 'A';
   document.getElementById('psmGoal').value = '';
   document.getElementById('psmOcc').value = '';
   psmRenderSales();
@@ -2314,7 +2333,9 @@ async function savePastShift() {
   if (!dateVal) { alert('Pick a date for the shift.'); return; }
   const startDt = new Date(dateVal + 'T' + (startVal||'09:00'));
   const endDt   = new Date(dateVal + 'T' + (endVal  ||'17:00'));
-  const tier = document.getElementById('psmTier').value;
+  const tier      = document.getElementById('psmTier').value;
+  const hotel     = document.getElementById('psmHotel').value || null;
+  const shiftType = document.getElementById('psmShiftType').value || 'A';
   const total = psmSales.reduce((a,s)=>a+s.amount,0);
   const totalCommission = Math.round(psmSales.reduce((a,s)=>a+(s.commission||0),0)*100)/100;
   const guestsSold = psmSales.reduce((a,s)=>a+s.guests,0);
@@ -2331,7 +2352,7 @@ async function savePastShift() {
     occ: parseFloat(document.getElementById('psmOcc').value)||null,
     occType: state.occType,
     totalGuests: guestsSold, guestsSold, conv: 0,
-    hotelTier: tier, hotel: null,
+    hotelTier: tier, hotel, shiftType,
     topProduct: Object.keys(pt).sort((a,b)=>pt[b]-pt[a])[0]||null,
     notes: '', sales: psmSales,
   };
@@ -2726,11 +2747,26 @@ setInterval(updateTimer,1000);
         <input type="date" id="psmDate" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
       </div>
       <div class="input-group" style="margin-bottom:0">
-        <label>Hotel tier for this shift</label>
+        <label>Hotel <span style="font-weight:400;color:var(--text3)">optional</span></label>
+        <select id="psmHotel" class="hotel-select" onchange="psmHotelChanged()">
+          <option value="">— Select hotel —</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-row" style="margin-bottom:12px">
+      <div class="input-group" style="margin-bottom:0">
+        <label>Hotel tier</label>
         <select id="psmTier" class="hotel-select">
           <option value="Premier">Premier</option>
           <option value="Non-Premier">Non-Premier</option>
           <option value="UPH">UPH (Partner hotel)</option>
+        </select>
+      </div>
+      <div class="input-group" style="margin-bottom:0">
+        <label>Shift type</label>
+        <select id="psmShiftType" class="hotel-select">
+          <option value="A">A Shift</option>
+          <option value="B">B Shift</option>
         </select>
       </div>
     </div>
