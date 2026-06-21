@@ -998,30 +998,32 @@ function showView(v) {
   if (v === 'create') buildCreateForm();
 }
 
+let _loginUsers = [];
+
 async function loadProfiles() {
   const grid = document.getElementById('profileGrid');
-  let users = [];
   try {
-    users = await apiGet('/api/users') || [];
+    _loginUsers = await apiGet('/api/users') || [];
     serverOk = true;
-    lsSet('cachedUsers', users);
+    lsSet('cachedUsers', _loginUsers);
   } catch {
     serverOk = false;
-    users = lsGet('cachedUsers', []);
+    _loginUsers = lsGet('cachedUsers', []);
   }
-  if (!users.length) {
+  if (!_loginUsers.length) {
     grid.innerHTML = '<p style="grid-column:1/-1;font-size:13px;color:var(--text2);text-align:center">No profiles yet — create the first one!</p>';
     return;
   }
-  grid.innerHTML = users.map(u => `
-    <button class="profile-card" onclick="startLogin(${JSON.stringify(JSON.stringify(u))})">
+  grid.innerHTML = _loginUsers.map((u, i) => `
+    <button class="profile-card" onclick="startLogin(${i})">
       <div class="profile-avatar" style="background:${u.color}22">${u.emoji}</div>
       <div class="profile-name">${u.name}</div>
     </button>`).join('');
 }
 
-async function startLogin(userJson) {
-  const user = JSON.parse(userJson);
+async function startLogin(idx) {
+  const user = _loginUsers[idx];
+  if (!user) return;
   document.getElementById('loginError').textContent = '';
   document.getElementById('pinEmoji').textContent = user.emoji;
   document.getElementById('pinName').textContent  = user.name;
