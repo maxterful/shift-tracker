@@ -235,10 +235,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* ── Category pills ───────────────────────────────────────── */
 .cat-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.cat-pill { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 14px 6px 12px; border-radius: 12px; border: 1.5px solid; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.12s; text-align: center; background: var(--bg); font-family: inherit; line-height: 1.3; }
-.cat-pill .cat-icon { font-size: 22px; line-height: 1; }
-.cat-pill:hover { filter: brightness(0.92); transform: translateY(-1px); }
-.cat-pill.active { color: #fff !important; }
+.cat-pill { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 14px 6px 12px; border-radius: 12px; border: 1.5px solid; cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.15s; text-align: center; font-family: inherit; line-height: 1.3; }
+.cat-pill .cat-icon { font-size: 22px; line-height: 1; transition: color 0.15s; }
+.cat-pill:hover { opacity: 0.85; transform: translateY(-1px); }
+.cat-pill.active { box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
 
 /* ── Product list ─────────────────────────────────────────── */
 .product-search { width: 100%; font-size: 14px; padding: 9px 11px; border-radius: var(--radius); border: 1px solid var(--border2); background: var(--bg); color: var(--text); font-family: inherit; margin-bottom: 8px; min-height: 40px; }
@@ -806,14 +806,14 @@ const PRODUCT_CATEGORIES = [
     ],
     get products() { return this.subgroups.flatMap(s => s.products); }
   },
-  { name: 'VIP Tours', color: '#9333EA', icon: 'ti-crown',
+  { name: 'VIP Tours', color: '#7E22CE', icon: 'ti-crown',
     subgroups: [
       { label: 'Non-Private', products: ['VIP TOUR: NON-PRIVATE USF', 'VIP TOUR: NON-PRIVATE IOA', 'VIP TOUR: NON-PRIVATE PTP', 'VIP TOUR: NON-PRIVATE EPIC'] },
       { label: 'Private', products: ['VIP TOUR: PRIVATE USF', 'VIP TOUR: PRIVATE IOA', 'VIP TOUR: PRIVATE PTP', 'VIP TOUR: PRIVATE PTP 2D', 'VIP TOUR: PRIVATE EPIC'] }
     ],
     get products() { return this.subgroups.flatMap(s => s.products); }
   },
-  { name: 'Volcano Bay', color: '#0284C7', icon: 'ti-waves', products: [
+  { name: 'Volcano Bay', color: '#0284C7', icon: 'ti-volcano', products: [
     '1D VB AD', '1D VB CH', '1D VB AD FL', '1D VB CH FL'
   ]},
   { name: 'Dining', color: '#BE185D', icon: 'ti-tools-kitchen-2',
@@ -824,7 +824,7 @@ const PRODUCT_CATEGORIES = [
     ],
     get products() { return this.subgroups.flatMap(s => s.products); }
   },
-  { name: 'Add-Ons', color: '#6B7280', icon: 'ti-puzzle',
+  { name: 'Add-Ons', color: '#6366F1', icon: 'ti-puzzle',
     subgroups: [
       { label: 'Photos', products: ['1D MY UNIVERSAL PHOTOS', '3D MY UNIVERSAL PHOTOS', '5D MY UNIVERSAL PHOTOS'] },
       { label: 'Cabanas', products: ['CABANA - SINGLE', 'CABANA - LOWER', 'CABANA - UPPER', 'CABANA - KIDS AREA', 'CABANA - FAMILY'] },
@@ -1132,13 +1132,20 @@ function updatePinDots() {
 }
 async function submitPin() {
   if (!pinResolve || pinBuf.length !== 4) return;
+  const resolve = pinResolve;
   try {
     const data = await apiPost('/api/login', { userId: pinUserId, pin: pinBuf });
-    if (data) { closePinModal(); serverOk = true; pinResolve(data); }
-    else { showPinError('Wrong PIN — try again.'); }
+    if (data) {
+      closePinModal();
+      serverOk = true;
+      resolve(data);
+    } else {
+      showPinError('Wrong PIN — try again.');
+    }
   } catch(e) {
     if (e.message === '401') showPinError('Wrong PIN — try again.');
-    else showPinError('Server unreachable.');
+    else if (e.message === '404') showPinError('Account not found — server may have reset. Recreate your profile.');
+    else showPinError('Cannot reach server — check your connection.');
   }
 }
 function showPinError(msg) {
@@ -1272,8 +1279,12 @@ let selectedCategory = null;
 function renderCategoryPills() {
   document.getElementById('catPills').innerHTML = PRODUCT_CATEGORIES.map(cat => {
     const active = selectedCategory && selectedCategory.name === cat.name;
-    return `<button class="cat-pill${active?' active':''}" style="color:${active?'#fff':cat.color};border-color:${active?cat.color:cat.color+'50'};background:${active?cat.color:cat.color+'14'}" onclick="selectCategory('${cat.name}')">
-      <i class="ti ${cat.icon} cat-icon"></i>${cat.name}
+    const bg     = active ? cat.color : 'var(--bg2)';
+    const border = active ? cat.color : 'var(--border2)';
+    const iconColor = active ? '#fff' : cat.color;
+    const textColor = active ? '#fff' : 'var(--text2)';
+    return `<button class="cat-pill${active?' active':''}" style="background:${bg};border-color:${border};color:${textColor}" onclick="selectCategory('${cat.name}')">
+      <i class="ti ${cat.icon} cat-icon" style="color:${iconColor}"></i>${cat.name}
     </button>`;
   }).join('');
 }
@@ -1406,8 +1417,9 @@ async function renderLeaderboard() {
   const el = document.getElementById('leaderboardList');
   el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
   try {
-    const board = await apiGet('/api/leaderboard?period=' + lbPeriod);
-    if (!board?.length) { el.innerHTML='<div class="empty-state">No completed shifts yet — end your first shift to appear here!</div>'; return; }
+    const raw = await apiGet('/api/leaderboard?period=' + lbPeriod);
+    const board = (raw || []).filter(r => r.shiftCount > 0);
+    if (!board.length) { el.innerHTML='<div class="empty-state">No completed shifts for this period — end a shift to appear here!</div>'; return; }
     const medals = ['🥇','🥈','🥉'];
     const rankClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
     el.innerHTML = board.map((row,i) => {
