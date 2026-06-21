@@ -1707,7 +1707,7 @@ async function savePastShift() {
     occ: parseFloat(document.getElementById('psmOcc').value)||null,
     occType: state.occType,
     totalGuests: guestsSold, guestsSold, conv: 0,
-    hotelTier: tier, hotel: state.hotel||null,
+    hotelTier: tier, hotel: null,
     topProduct: Object.keys(pt).sort((a,b)=>pt[b]-pt[a])[0]||null,
     notes: '', sales: psmSales,
   };
