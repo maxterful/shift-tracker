@@ -863,12 +863,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 // ─── Constants ──────────────────────────────────────────────
 const PRODUCT_CATEGORIES = [
   { name: 'Epic Universe', color: '#7C3AED', icon: 'ti-planet', products: [
-    'Epic Universe 1D AD', 'Epic Universe 1D CH', '1D EPIC AP AD'
+    'Epic Universe 1D AD', 'Epic Universe 1D CH', '1D EPIC AP AD', 'Epic After 2PM Guest Recovery'
   ]},
   { name: 'USF / IOA', color: '#2563EB', icon: 'ti-building-castle',
     subgroups: [
-      { label: 'Base', products: ['USF/IOA 1D Base AD', 'USF/IOA 1D Base CH'] },
-      { label: 'Park-to-Park', products: ['USF/IOA 1D PTP AD', 'USF/IOA 1D PTP CH'] },
+      { label: '1-Day Base', products: ['USF/IOA 1D Base AD', 'USF/IOA 1D Base CH'] },
+      { label: '2-Day Base', products: ['USF/IOA 2D Base AD', 'USF/IOA 2D Base CH'] },
+      { label: '1-Day Park-to-Park', products: ['USF/IOA 1D PTP AD', 'USF/IOA 1D PTP CH'] },
+      { label: '2-Day Park-to-Park', products: ['USF/IOA 2D PTP AD', 'USF/IOA 2D PTP CH'] },
       { label: 'Conversions', products: ['1D USF/IOA BASE CONV <2PM AD', '1D USF/IOA BASE CONV <4PM AD', '1D USF/IOA PTP CONV <2PM AD', '1D USF/IOA PTP CONV <4PM AD'] }
     ],
     get products() { return this.subgroups.flatMap(s => s.products); }
