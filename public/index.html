@@ -556,7 +556,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         </div>
         <div class="input-group" style="margin-bottom:0">
           <label>Guests in group</label>
-          <input type="number" id="saleGuests" placeholder="1" min="1" value="1" inputmode="numeric">
+          <input type="number" id="saleGuests" placeholder="1" min="1" value="1" inputmode="numeric" oninput="updateSalePreview()">
         </div>
       </div>
       <div class="commission-preview" id="salePreview" style="display:none">
@@ -1648,31 +1648,34 @@ function psmClearProduct() {
   document.getElementById('psmPriceSection').style.display = 'none';
 }
 function psmUpdatePreview() {
-  const amt = parseFloat(document.getElementById('psmAmount').value)||0;
+  const unitAmt = parseFloat(document.getElementById('psmAmount').value)||0;
+  const guests = parseInt(document.getElementById('psmGuests').value)||1;
   const tier = document.getElementById('psmTier').value;
   const el = document.getElementById('psmPreview');
-  if (!amt||!psmSelectedProduct) { el.style.display='none'; return; }
+  if (!unitAmt||!psmSelectedProduct) { el.style.display='none'; return; }
+  const amt = unitAmt*guests;
   const taxRate = state.taxRate??6.5;
   const inclTax = state.priceIncludesTax!==false;
   const preTax = inclTax?amt/(1+taxRate/100):amt;
   const taxAmt = inclTax?amt-preTax:amt*taxRate/100;
   const comm = calcCommission(psmSelectedProduct,preTax,tier);
   el.style.display='';
-  document.getElementById('psmPreviewPre').textContent = fmtD(preTax);
+  document.getElementById('psmPreviewPre').textContent = fmtD(preTax)+(guests>1?' ('+guests+'×)':'');
   document.getElementById('psmPreviewTax').textContent = fmtD(taxAmt);
   document.getElementById('psmPreviewComm').textContent = fmtD(comm);
 }
 function psmAddSale() {
-  const amt = parseFloat(document.getElementById('psmAmount').value);
-  if (!amt||amt<=0||!psmSelectedProduct) return;
+  const unitAmt = parseFloat(document.getElementById('psmAmount').value);
+  if (!unitAmt||unitAmt<=0||!psmSelectedProduct) return;
   const guests = parseInt(document.getElementById('psmGuests').value)||1;
+  const amt = Math.round(unitAmt*guests*100)/100;
   const tier = document.getElementById('psmTier').value;
   const taxRate = state.taxRate??6.5;
   const inclTax = state.priceIncludesTax!==false;
   const preTax = inclTax?amt/(1+taxRate/100):amt;
   const taxAmt = Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
   const commission = calcCommission(psmSelectedProduct,preTax,tier);
-  psmSales.push({product:psmSelectedProduct,amount:amt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note:'',time:nowStr(),ts:Date.now()});
+  psmSales.push({product:psmSelectedProduct,amount:amt,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note:'',time:nowStr(),ts:Date.now()});
   psmRenderSales();
   psmClearProduct();
   document.getElementById('psmPriceSection').style.display='none';
@@ -1759,9 +1762,10 @@ function exitPastEditMode() {
 
 async function logSale() {
   if (!state.selectedProduct) { alert('Select a product first.'); return; }
-  const amt=parseFloat(document.getElementById('saleAmount').value);
-  if (!amt||amt<=0) { alert('Enter a valid sale amount.'); return; }
+  const unitAmt=parseFloat(document.getElementById('saleAmount').value);
+  if (!unitAmt||unitAmt<=0) { alert('Enter a valid sale amount.'); return; }
   const guests=parseInt(document.getElementById('saleGuests').value)||1;
+  const amt=Math.round(unitAmt*guests*100)/100;
   const note=document.getElementById('saleNote').value.trim();
   const tier=state.hotelTier||'Premier';
   const taxRate=state.taxRate??6.5;
@@ -1769,7 +1773,7 @@ async function logSale() {
   const preTax=inclTax ? amt/(1+taxRate/100) : amt;
   const taxAmt=Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
   const commission=calcCommission(state.selectedProduct,preTax,tier);
-  const sale={product:state.selectedProduct,amount:amt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now()};
+  const sale={product:state.selectedProduct,amount:amt,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now()};
 
   if (pastEditShiftId !== null) {
     try {
@@ -1820,9 +1824,11 @@ function updateTaxSettings() {
   state.updatedAt=Date.now(); scheduleSave(); updateSalePreview();
 }
 function updateSalePreview() {
-  const amt=parseFloat(document.getElementById('saleAmount').value)||0;
+  const unitAmt=parseFloat(document.getElementById('saleAmount').value)||0;
+  const guests=parseInt(document.getElementById('saleGuests').value)||1;
   const el=document.getElementById('salePreview');
-  if (!amt||!state.selectedProduct) { el.style.display='none'; return; }
+  if (!unitAmt||!state.selectedProduct) { el.style.display='none'; return; }
+  const amt=unitAmt*guests;
   const tier=state.hotelTier||'Premier';
   const taxRate=state.taxRate??6.5;
   const inclTax=state.priceIncludesTax!==false;
@@ -1831,7 +1837,7 @@ function updateSalePreview() {
   const commission=calcCommission(state.selectedProduct,preTax,tier);
   const rate=commRateFor(state.selectedProduct,tier);
   el.style.display='';
-  document.getElementById('previewPreTax').textContent=fmtD(preTax);
+  document.getElementById('previewPreTax').textContent=fmtD(preTax)+(guests>1?' ('+guests+'×'+fmtD(unitAmt/(1+taxRate/100))+')':'');
   document.getElementById('previewTax').textContent=fmtD(taxAmt);
   document.getElementById('previewComm').textContent=fmtD(commission);
   document.getElementById('previewRate').textContent=(rate*100).toFixed(2)+'%';
@@ -2050,7 +2056,7 @@ setInterval(updateTimer,1000);
           </div>
           <div class="input-group" style="margin-bottom:0">
             <label>Guests</label>
-            <input type="number" id="psmGuests" value="1" min="1" inputmode="numeric">
+            <input type="number" id="psmGuests" value="1" min="1" inputmode="numeric" oninput="psmUpdatePreview()">
           </div>
         </div>
         <div id="psmPreview" style="display:none" class="commission-preview">
