@@ -179,6 +179,28 @@ app.delete('/api/me/history', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Add a sale to a past shift entry and recalculate totals
+app.patch('/api/me/history/:id', auth, (req, res) => {
+  const f   = path.join(udir(req.uid), 'history.json');
+  const h   = read(f, []);
+  const idx = h.findIndex(e => e.id === Number(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  const sales       = [...(h[idx].sales || []), req.body];
+  const guestsSold  = sales.reduce((a, s) => a + (s.guests || 0), 0);
+  const totalGuests = guestsSold + (h[idx].guestsExtra || 0);
+  const pt          = {};
+  sales.forEach(s => { pt[s.product] = (pt[s.product] || 0) + s.amount; });
+  h[idx] = {
+    ...h[idx], sales,
+    totalSales:      Math.round(sales.reduce((a, s) => a + s.amount,               0) * 100) / 100,
+    totalCommission: Math.round(sales.reduce((a, s) => a + (s.commission || 0),    0) * 100) / 100,
+    guestsSold, totalGuests, txCount: guestsSold, saleCount: sales.length,
+    topProduct: Object.keys(pt).sort((a, b) => pt[b] - pt[a])[0] || null,
+  };
+  write(f, h);
+  res.json({ ok: true, entry: h[idx] });
+});
+
 // ── Leaderboard ───────────────────────────────────────────
 app.get('/api/leaderboard', (_req, res) => {
   const { period = 'alltime' } = _req.query;

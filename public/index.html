@@ -299,6 +299,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .shc-stats { font-size: 12px; color: var(--text2); display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
 .shc-notes { font-size: 12px; color: var(--text3); margin-top: 10px; padding-top: 10px; border-top: 0.5px solid var(--border); font-style: italic; }
 .shc-actions { display: flex; align-items: center; gap: 6px; }
+.shc-hotel { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.shc-time { font-size: 11px; color: var(--text2); font-weight: 500; }
+.past-edit-banner { display:none; align-items:center; gap:10px; background:var(--amber-bg); border:1px solid var(--amber-border); border-radius:var(--radius); padding:10px 14px; margin-bottom:8px; }
+.past-edit-banner i { color:var(--amber-mid); font-size:16px; flex-shrink:0; }
+.past-edit-banner-text { flex:1; font-size:13px; font-weight:600; color:var(--amber); }
+.hotel-select { width:100%; font-size:13px; padding:9px 11px; border-radius:var(--radius); border:1px solid var(--border2); background:var(--bg); color:var(--text); font-family:inherit; min-height:40px; }
+.hotel-select:focus { outline:none; border-color:var(--blue-mid); }
+.past-shift-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:flex-end; justify-content:center; }
+.past-shift-modal-inner { background:var(--bg); border-radius:16px 16px 0 0; padding:20px; width:100%; max-width:520px; max-height:85vh; overflow-y:auto; }
+.psm-title { font-size:17px; font-weight:700; margin-bottom:16px; }
 .past-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
 .past-stat { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; }
 .past-stat-val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
@@ -503,17 +513,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <div class="tabs-wrap">
     <div class="tabs">
-      <button class="tab active" onclick="switchTab('log',this)">Log a sale</button>
-      <button class="tab" onclick="switchTab('guests',this)">Guests</button>
-      <button class="tab" onclick="switchTab('history',this)">This shift</button>
-      <button class="tab" onclick="switchTab('past',this)">Past shifts</button>
-      <button class="tab" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
-      <button class="tab" onclick="switchTab('setup',this)">Setup</button>
+      <button class="tab active" id="tab-btn-log"         onclick="switchTab('log',this)">Log a sale</button>
+      <button class="tab"        id="tab-btn-guests"      onclick="switchTab('guests',this)">Guests</button>
+      <button class="tab"        id="tab-btn-history"     onclick="switchTab('history',this)">This shift</button>
+      <button class="tab"        id="tab-btn-past"        onclick="switchTab('past',this)">Past shifts</button>
+      <button class="tab"        id="tab-btn-leaderboard" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
+      <button class="tab"        id="tab-btn-setup"       onclick="switchTab('setup',this)">Setup</button>
     </div>
   </div>
 
   <!-- LOG SALE -->
   <div class="tab-panel active" id="tab-log">
+    <div class="past-edit-banner" id="pastEditBanner">
+      <i class="ti ti-pencil"></i>
+      <span class="past-edit-banner-text" id="pastEditBannerText">Adding to past shift</span>
+      <button class="btn btn-sm" onclick="exitPastEditMode()">Done</button>
+    </div>
     <div class="card" id="catCard">
       <div class="section-title">Step 1 — Select category</div>
       <div class="cat-pills" id="catPills"></div>
@@ -630,7 +645,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div class="section-title" style="margin:0">Completed shifts</div>
-        <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear all</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-primary" onclick="openPastShiftModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Log past shift</button>
+          <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear all</button>
+        </div>
       </div>
       <div id="pastShiftsList"><div class="empty-state">No completed shifts yet</div></div>
     </div>
@@ -673,6 +691,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <!-- SETUP -->
   <div class="tab-panel" id="tab-setup">
+    <div class="card">
+      <div class="section-title">Your hotel today</div>
+      <select class="hotel-select" id="hotelSelect" onchange="updateHotel()">
+        <option value="">— Select your hotel —</option>
+      </select>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Selecting a hotel automatically sets your commission tier.</div>
+    </div>
     <div class="card">
       <div class="section-title">Shift goal & occupancy</div>
       <div class="input-row">
@@ -843,6 +868,43 @@ const PRODUCT_CATEGORIES = [
     get products() { return this.subgroups.flatMap(s => s.products); }
   }
 ];
+const HOTEL_TIERS = {
+  'Premier': [
+    'Loews Portofino Bay Hotel','Hard Rock Hotel','Loews Royal Pacific Resort',
+    'Loews Sapphire Falls Resort','Universal Helios Grand Hotel',
+    'Universal Aventura Hotel','Universal Stella Nova Resort','Universal Terra Luna Resort',
+  ],
+  'Non-Premier': [
+    'Universal Cabana Bay Beach Resort',
+    'Endless Summer Resort – Surfside Inn & Suites',
+    'Endless Summer Resort – Dockside Inn & Suites',
+  ],
+  'UPH': [
+    'Avanti International Resort','CoCo Key Hotel & Water Resort',
+    'Courtyard by Marriott I-Drive/Convention Center',
+    'DoubleTree at Entrance to Universal (UDX)',
+    'DoubleTree Orlando at SeaWorld (Theme Park)',
+    'Drury Inn & Suites Orlando',
+    'Fairfield Inn & Suites at SeaWorld/Vineland',
+    'Hilton Orlando','Holiday Inn Express at SeaWorld',
+    'Homewood Suites I-Drive (American)',
+    'Hotel Landy Orlando',
+    'Hyatt Place I-Drive / Convention Center',
+    'Hyatt House Orlando International Drive',
+    'Hyatt Regency Orlando',
+    'Residence Inn at SeaWorld',
+    'Rosen Centre Hotel','Rosen Inn International',
+    'Rosen Inn at Pointe Orlando','Rosen Inn',
+    'Rosen Plaza Hotel','Rosen Shingle Creek',
+    'Sheraton Lake Buena Vista (Four Points)',
+    'Wyndham I-Drive Avanti',
+  ],
+};
+function tierForHotel(name) {
+  for (const [tier, list] of Object.entries(HOTEL_TIERS)) { if (list.includes(name)) return tier; }
+  return 'Premier';
+}
+
 const CHART_COLORS  = ['#2563EB','#16A34A','#7C3AED','#D97706','#0D9488','#DC2626','#0284C7','#9333EA'];
 const EMOJIS        = ['😎','🏄','🎯','💪','⭐','🌟','🔥','💼','🎪','🏆','💎','🚀','👑','✨','🎭','🌊'];
 const COLORS        = ['#2563EB','#16A34A','#7C3AED','#EA580C','#DC2626','#DB2777','#0D9488','#D97706'];
@@ -914,6 +976,7 @@ async function apiFetch(method, path, body) {
 const apiGet    = p       => apiFetch('GET',    p);
 const apiPut    = (p, b)  => apiFetch('PUT',    p, b);
 const apiPost   = (p, b)  => apiFetch('POST',   p, b);
+const apiPatch  = (p, b)  => apiFetch('PATCH',  p, b);
 const apiDelete = p       => apiFetch('DELETE', p);
 
 function setSyncUI(status, label) {
@@ -932,7 +995,7 @@ function lsSet(key, v)  { try { localStorage.setItem(key, JSON.stringify(v)); } 
 // ─── Shift state ─────────────────────────────────────────────
 let state = {
   sales: [], guestsExtra: 0, goal: 0, occ: null, occType: 'Hotel',
-  hotelTier: 'Premier', taxRate: 6.5, priceIncludesTax: true,
+  hotelTier: 'Premier', hotel: null, taxRate: 6.5, priceIncludesTax: true,
   selectedProduct: null, shiftStart: Date.now(), shiftOpen: true, notes: '', updatedAt: 0
 };
 let prodChart = null, timeChart = null;
@@ -1193,6 +1256,7 @@ async function enterApp() {
   }
 
   if (!local) render();
+  buildHotelSelect();
   renderCategoryPills();
   updateTimer();
 }
@@ -1209,6 +1273,18 @@ async function switchUser() {
   showLoginScreen();
 }
 
+function buildHotelSelect() {
+  const sel = document.getElementById('hotelSelect');
+  const labels = { Premier: 'On-Site · Premier', 'Non-Premier': 'On-Site · Non-Premier', UPH: 'Partner Hotels (UPH)' };
+  sel.innerHTML = '<option value="">— Select your hotel —</option>';
+  for (const [tier, hotels] of Object.entries(HOTEL_TIERS)) {
+    const og = document.createElement('optgroup');
+    og.label = labels[tier];
+    hotels.forEach(h => { const o = document.createElement('option'); o.value = o.textContent = h; og.appendChild(o); });
+    sel.appendChild(og);
+  }
+}
+
 function syncUIToState() {
   document.getElementById('goalInput').value          = state.goal || '';
   document.getElementById('occInput').value           = state.occ != null ? state.occ : '';
@@ -1217,6 +1293,7 @@ function syncUIToState() {
   document.getElementById('hotelTierSelect').value    = state.hotelTier || 'Premier';
   document.getElementById('taxRateInput').value       = state.taxRate ?? 6.5;
   document.getElementById('priceIncludesTaxCheck').checked = state.priceIncludesTax !== false;
+  if (state.hotel) document.getElementById('hotelSelect').value = state.hotel;
   if (!state.shiftOpen) {
     document.getElementById('shiftBadge').textContent = '● Closed';
     document.getElementById('shiftBadge').className   = 'badge badge-closed';
@@ -1386,17 +1463,25 @@ async function renderPastShifts() {
   sc.style.display='';
   el.innerHTML = history.map((h,i) => {
     const gp = h.goal>0?Math.round((h.totalSales/h.goal)*100):null;
+    const timeStr = h.startTime ? `${h.startTime}${h.endTime?' – '+h.endTime:''}` : '';
     const dots=[h.txCount+' sale'+(h.txCount!==1?'s':''),h.totalGuests+' guest'+(h.totalGuests!==1?'s':''),h.totalGuests>0?h.conv+'% conv':null,h.topProduct?'Top: '+h.topProduct:null].filter(Boolean).join(' · ');
+    const sid = h.id ?? 'null';
     return `<div class="shift-history-card">
       <div class="shc-header">
-        <div><div class="shc-date">${h.date}</div><div class="shc-duration">${fmtDur(h.duration)}${h.occ!=null?' · '+h.occ+'% '+h.occType:''}</div></div>
+        <div>
+          <div class="shc-date">${h.date}${timeStr?`<span class="shc-time" style="margin-left:6px">${timeStr}</span>`:''}</div>
+          <div class="shc-duration">${h.duration?fmtDur(h.duration):''}${h.occ!=null?' · '+h.occ+'% '+h.occType:''}</div>
+          ${h.hotel?`<div class="shc-hotel">${h.hotel} · ${h.hotelTier||''}</div>`:''}
+        </div>
         <div class="shc-actions">
-          <button class="btn btn-sm" onclick="exportHistoryCSV(${h.id??'null'},${i})">CSV</button>
-          <button class="trash-btn" onclick="deleteHistoryEntry(${h.id??'null'},${i})"><i class="ti ti-trash"></i></button>
+          <button class="btn btn-sm" onclick="enterPastEditMode(${sid},'${h.date}')"><i class="ti ti-plus"></i></button>
+          <button class="btn btn-sm" onclick="exportHistoryCSV(${sid},${i})">CSV</button>
+          <button class="trash-btn" onclick="deleteHistoryEntry(${sid},${i})"><i class="ti ti-trash"></i></button>
         </div>
       </div>
       <div><span class="shc-total">${fmt(h.totalSales)}</span>${gp!==null?`<span class="shc-goal${gp<80?' miss':''}">${gp}% of ${fmt(h.goal)}</span>`:''}</div>
       <div class="shc-stats">${dots}</div>
+      ${h.totalCommission?`<div class="shc-stats" style="color:var(--green-mid);font-weight:600">Commission: ${fmtD(h.totalCommission)}</div>`:''}
       ${h.notes?`<div class="shc-notes">${h.notes}</div>`:''}
     </div>`;
   }).join('');
@@ -1475,6 +1560,156 @@ async function renderWeeklyComm() {
   }
 }
 
+// ─── Past shift modal (log a retroactive shift) ───────────────
+let psmSales = [];
+let psmSelectedCat = null;
+let psmSelectedProduct = null;
+
+function openPastShiftModal() {
+  psmSales = []; psmSelectedCat = null; psmSelectedProduct = null;
+  // Default to today's date and a plausible shift window
+  const now = new Date();
+  document.getElementById('psmDate').value = now.toISOString().slice(0,10);
+  document.getElementById('psmStartTime').value = '09:00';
+  document.getElementById('psmEndTime').value = now.toTimeString().slice(0,5);
+  document.getElementById('psmTier').value = state.hotelTier || 'Premier';
+  psmRenderSales();
+  psmRenderCatPills();
+  document.getElementById('psmProdSection').style.display = 'none';
+  document.getElementById('psmPriceSection').style.display = 'none';
+  document.getElementById('psmSearch').value = '';
+  document.getElementById('pastShiftModal').style.display = 'flex';
+}
+function closePastShiftModal() {
+  document.getElementById('pastShiftModal').style.display = 'none';
+  psmSales = []; psmSelectedCat = null; psmSelectedProduct = null;
+}
+function psmRenderSales() {
+  const el = document.getElementById('psmSalesList');
+  if (!psmSales.length) { el.innerHTML=''; return; }
+  const total = psmSales.reduce((a,s)=>a+s.amount,0);
+  el.innerHTML = `<div style="margin-bottom:8px">
+    ${psmSales.map((s,i)=>`<div class="sale-item">
+      <span class="sale-time">${s.time}</span>
+      <div class="sale-product">${s.product}</div>
+      <span class="sale-guests">${s.guests}g</span>
+      <span class="sale-amount">${fmtD(s.amount)}</span>
+      ${s.commission!=null?`<span class="sale-commission">+${fmtD(s.commission)}</span>`:''}
+      <button class="trash-btn" onclick="psmDeleteSale(${i})"><i class="ti ti-trash"></i></button>
+    </div>`).join('')}
+    <div style="text-align:right;font-weight:700;font-size:15px;padding:6px 0;border-top:1px solid var(--border);margin-top:4px">Total: ${fmt(total)}</div>
+  </div>`;
+}
+function psmDeleteSale(i) { psmSales.splice(i,1); psmRenderSales(); }
+function psmRenderCatPills() {
+  document.getElementById('psmCatPills').innerHTML = PRODUCT_CATEGORIES.map(cat => {
+    const active = psmSelectedCat && psmSelectedCat.name === cat.name;
+    const bg = active ? cat.color : 'var(--bg2)';
+    const border = active ? cat.color : 'var(--border2)';
+    return `<button class="cat-pill${active?' active':''}" style="background:${bg};border-color:${border};color:${active?'#fff':'var(--text2)'}" onclick="psmSelectCat('${cat.name}')">
+      <i class="ti ${cat.icon} cat-icon" style="color:${active?'#fff':cat.color}"></i>${cat.name}
+    </button>`;
+  }).join('');
+}
+function psmSelectCat(name) {
+  psmSelectedCat = PRODUCT_CATEGORIES.find(c=>c.name===name);
+  psmSelectedProduct = null;
+  document.getElementById('psmSearch').value = '';
+  document.getElementById('psmProdSection').style.display = '';
+  document.getElementById('psmPriceSection').style.display = 'none';
+  psmRenderCatPills();
+  psmRenderProdList();
+}
+function psmFilterProducts() { psmRenderProdList(); }
+function psmRenderProdList() {
+  if (!psmSelectedCat) return;
+  const query = document.getElementById('psmSearch').value.toLowerCase();
+  const el = document.getElementById('psmProdList');
+  if (query || !psmSelectedCat.subgroups) {
+    const list = psmSelectedCat.products.filter(p=>!query||p.toLowerCase().includes(query));
+    el.innerHTML = list.map(p=>`<div class="prod-list-item" onclick="psmSelectProduct('${p.replace(/'/g,"\\'")}')">${p}</div>`).join('');
+    return;
+  }
+  el.innerHTML = psmSelectedCat.subgroups.map(sg=>
+    `<div class="prod-subgroup-label">${sg.label}</div>`+sg.products.map(p=>`<div class="prod-list-item" onclick="psmSelectProduct('${p.replace(/'/g,"\\'")}')">${p}</div>`).join('')
+  ).join('');
+}
+function psmSelectProduct(p) {
+  psmSelectedProduct = p;
+  document.getElementById('psmSelProduct').textContent = p;
+  document.getElementById('psmPriceSection').style.display = '';
+  document.getElementById('psmAmount').value = '';
+  document.getElementById('psmGuests').value = '1';
+  document.getElementById('psmPreview').style.display = 'none';
+  setTimeout(()=>document.getElementById('psmAmount').focus(),50);
+}
+function psmClearProduct() {
+  psmSelectedProduct = null;
+  document.getElementById('psmPriceSection').style.display = 'none';
+}
+function psmUpdatePreview() {
+  const amt = parseFloat(document.getElementById('psmAmount').value)||0;
+  const tier = document.getElementById('psmTier').value;
+  const el = document.getElementById('psmPreview');
+  if (!amt||!psmSelectedProduct) { el.style.display='none'; return; }
+  const taxRate = state.taxRate??6.5;
+  const inclTax = state.priceIncludesTax!==false;
+  const preTax = inclTax?amt/(1+taxRate/100):amt;
+  const taxAmt = inclTax?amt-preTax:amt*taxRate/100;
+  const comm = calcCommission(psmSelectedProduct,preTax,tier);
+  el.style.display='';
+  document.getElementById('psmPreviewPre').textContent = fmtD(preTax);
+  document.getElementById('psmPreviewTax').textContent = fmtD(taxAmt);
+  document.getElementById('psmPreviewComm').textContent = fmtD(comm);
+}
+function psmAddSale() {
+  const amt = parseFloat(document.getElementById('psmAmount').value);
+  if (!amt||amt<=0||!psmSelectedProduct) return;
+  const guests = parseInt(document.getElementById('psmGuests').value)||1;
+  const tier = document.getElementById('psmTier').value;
+  const taxRate = state.taxRate??6.5;
+  const inclTax = state.priceIncludesTax!==false;
+  const preTax = inclTax?amt/(1+taxRate/100):amt;
+  const taxAmt = Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
+  const commission = calcCommission(psmSelectedProduct,preTax,tier);
+  psmSales.push({product:psmSelectedProduct,amount:amt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note:'',time:nowStr(),ts:Date.now()});
+  psmRenderSales();
+  psmClearProduct();
+  document.getElementById('psmPriceSection').style.display='none';
+}
+async function savePastShift() {
+  if (!psmSales.length) { alert('Add at least one sale before saving.'); return; }
+  const dateVal = document.getElementById('psmDate').value;
+  const startVal = document.getElementById('psmStartTime').value;
+  const endVal = document.getElementById('psmEndTime').value;
+  if (!dateVal) { alert('Pick a date for the shift.'); return; }
+  const startDt = new Date(dateVal + 'T' + (startVal||'09:00'));
+  const endDt   = new Date(dateVal + 'T' + (endVal  ||'17:00'));
+  const tier = document.getElementById('psmTier').value;
+  const total = psmSales.reduce((a,s)=>a+s.amount,0);
+  const totalCommission = Math.round(psmSales.reduce((a,s)=>a+(s.commission||0),0)*100)/100;
+  const guestsSold = psmSales.reduce((a,s)=>a+s.guests,0);
+  const pt={}; psmSales.forEach(s=>{pt[s.product]=(pt[s.product]||0)+s.amount;});
+  const entry = {
+    date: startDt.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
+    startTime: startDt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+    endTime: endDt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+    shiftStart: startDt.getTime(), shiftEnd: endDt.getTime(),
+    duration: endDt.getTime()-startDt.getTime(),
+    totalSales: Math.round(total*100)/100, totalCommission,
+    txCount: guestsSold, saleCount: psmSales.length,
+    goal: state.goal, occ: state.occ, occType: state.occType,
+    totalGuests: guestsSold, guestsSold, conv: 0,
+    hotelTier: tier, hotel: state.hotel||null,
+    topProduct: Object.keys(pt).sort((a,b)=>pt[b]-pt[a])[0]||null,
+    notes: '', sales: psmSales,
+  };
+  await addToHistory(entry);
+  historyCache = null;
+  closePastShiftModal();
+  switchTab('past', document.getElementById('tab-btn-past'));
+}
+
 // ─── Tab switching ────────────────────────────────────────────
 function switchTab(id, el) {
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
@@ -1502,7 +1737,27 @@ function clearProductSelection() {
   document.getElementById('salePreview').style.display = 'none';
 }
 
-function logSale() {
+// ─── Past shift edit mode ─────────────────────────────────────
+let pastEditShiftId   = null;
+let pastEditShiftDate = '';
+
+function enterPastEditMode(id, date) {
+  pastEditShiftId   = id;
+  pastEditShiftDate = date;
+  document.getElementById('pastEditBannerText').textContent = `Adding sales to: ${date}`;
+  document.getElementById('pastEditBanner').style.display = 'flex';
+  clearCategorySelection();
+  switchTab('log', document.getElementById('tab-btn-log'));
+}
+function exitPastEditMode() {
+  pastEditShiftId = null; pastEditShiftDate = '';
+  document.getElementById('pastEditBanner').style.display = 'none';
+  clearCategorySelection();
+  historyCache = null;
+  switchTab('past', document.getElementById('tab-btn-past'));
+}
+
+async function logSale() {
   if (!state.selectedProduct) { alert('Select a product first.'); return; }
   const amt=parseFloat(document.getElementById('saleAmount').value);
   if (!amt||amt<=0) { alert('Enter a valid sale amount.'); return; }
@@ -1514,7 +1769,27 @@ function logSale() {
   const preTax=inclTax ? amt/(1+taxRate/100) : amt;
   const taxAmt=Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
   const commission=calcCommission(state.selectedProduct,preTax,tier);
-  state.sales.push({product:state.selectedProduct,amount:amt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now()});
+  const sale={product:state.selectedProduct,amount:amt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now()};
+
+  if (pastEditShiftId !== null) {
+    try {
+      await apiPatch('/api/me/history/' + pastEditShiftId, sale);
+      historyCache = null;
+      document.getElementById('saleAmount').value='';
+      document.getElementById('saleNote').value='';
+      document.getElementById('saleGuests').value='1';
+      document.getElementById('salePreview').style.display='none';
+      document.getElementById('priceEntryCard').style.display='none';
+      state.selectedProduct=null;
+      renderCategoryPills(); renderProductListItems();
+      const txt = document.getElementById('pastEditBannerText');
+      txt.textContent = '✓ Sale added to ' + pastEditShiftDate;
+      setTimeout(()=>{ txt.textContent = 'Adding sales to: ' + pastEditShiftDate; }, 1800);
+    } catch { alert('Failed to save — check connection.'); }
+    return;
+  }
+
+  state.sales.push(sale);
   document.getElementById('saleAmount').value='';
   document.getElementById('saleNote').value='';
   document.getElementById('saleGuests').value='1';
@@ -1529,6 +1804,15 @@ function deleteSale(i) { if(confirm('Delete this sale?')){ state.sales.splice(i,
 function addGuests(n) { state.guestsExtra+=n; state.updatedAt=Date.now(); render(); scheduleSave(); }
 function promptCustomGuests() { const n=parseInt(prompt('How many guests?')); if(n&&n>0) addGuests(n); }
 function updateGoal() { state.goal=parseFloat(document.getElementById('goalInput').value)||0; state.updatedAt=Date.now(); render(); scheduleSave(); }
+function updateHotel() {
+  const hotel = document.getElementById('hotelSelect').value;
+  state.hotel = hotel || null;
+  if (hotel) {
+    state.hotelTier = tierForHotel(hotel);
+    document.getElementById('hotelTierSelect').value = state.hotelTier;
+  }
+  state.updatedAt = Date.now(); render(); scheduleSave();
+}
 function updateHotelTier() { state.hotelTier=document.getElementById('hotelTierSelect').value; state.updatedAt=Date.now(); render(); scheduleSave(); }
 function updateTaxSettings() {
   state.taxRate=parseFloat(document.getElementById('taxRateInput').value)||6.5;
@@ -1568,12 +1852,16 @@ async function endShift() {
   const pt={}; state.sales.forEach(s=>{pt[s.product]=(pt[s.product]||0)+s.amount;});
   const topProduct=Object.keys(pt).sort((a,b)=>pt[b]-pt[a])[0]||null;
   const totalCommission=Math.round(state.sales.reduce((a,s)=>a+(s.commission||0),0)*100)/100;
+  const startDt = new Date(state.shiftStart);
+  const endDt   = new Date(shiftEnd);
   const entry={
-    date:new Date().toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
+    date:startDt.toLocaleDateString([],{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
+    startTime:startDt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+    endTime:endDt.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
     shiftStart:state.shiftStart,shiftEnd,duration:shiftEnd-state.shiftStart,
     totalSales:total,txCount:guestsSold,saleCount:state.sales.length,goal:state.goal,
     occ:state.occ,occType:state.occType,totalGuests,guestsSold,conv,
-    totalCommission,hotelTier:state.hotelTier,
+    totalCommission,hotelTier:state.hotelTier,hotel:state.hotel||null,
     topProduct,notes:state.notes,sales:state.sales
   };
   await addToHistory(entry);
@@ -1716,5 +2004,71 @@ setInterval(updateTimer,1000);
   }
 })();
 </script>
+
+<!-- Past shift logging modal -->
+<div class="past-shift-modal" id="pastShiftModal" onclick="if(event.target===this)closePastShiftModal()">
+  <div class="past-shift-modal-inner">
+    <div class="psm-title">Log a past shift</div>
+    <div class="input-row" style="margin-bottom:12px">
+      <div class="input-group" style="margin-bottom:0">
+        <label>Date</label>
+        <input type="date" id="psmDate" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+      </div>
+      <div class="input-group" style="margin-bottom:0">
+        <label>Hotel tier for this shift</label>
+        <select id="psmTier" class="hotel-select">
+          <option value="Premier">Premier</option>
+          <option value="Non-Premier">Non-Premier</option>
+          <option value="UPH">UPH (Partner hotel)</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-row" style="margin-bottom:16px">
+      <div class="input-group" style="margin-bottom:0">
+        <label>Shift start time</label>
+        <input type="time" id="psmStartTime" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+      </div>
+      <div class="input-group" style="margin-bottom:0">
+        <label>Shift end time</label>
+        <input type="time" id="psmEndTime" style="font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;width:100%">
+      </div>
+    </div>
+    <div id="psmSalesList" style="margin-bottom:12px"></div>
+    <div id="psmCatSection">
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px">Add a sale</div>
+      <div class="cat-pills" id="psmCatPills" style="margin-bottom:8px"></div>
+      <div id="psmProdSection" style="display:none">
+        <input type="text" class="product-search" id="psmSearch" placeholder="Search products…" oninput="psmFilterProducts()">
+        <div class="prod-list" id="psmProdList"></div>
+      </div>
+      <div id="psmPriceSection" style="display:none;margin-top:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px" id="psmSelProduct"></div>
+        <div class="input-row">
+          <div class="input-group" style="margin-bottom:0">
+            <label>Amount ($)</label>
+            <input type="number" id="psmAmount" placeholder="0.00" min="0" step="0.01" inputmode="decimal" oninput="psmUpdatePreview()">
+          </div>
+          <div class="input-group" style="margin-bottom:0">
+            <label>Guests</label>
+            <input type="number" id="psmGuests" value="1" min="1" inputmode="numeric">
+          </div>
+        </div>
+        <div id="psmPreview" style="display:none" class="commission-preview">
+          <span><span style="color:var(--text3);font-size:11px">Pre-tax </span><strong id="psmPreviewPre"></strong></span>
+          <span><span style="color:var(--text3);font-size:11px">Tax </span><strong id="psmPreviewTax"></strong></span>
+          <span><span style="color:var(--green-mid);font-size:11px">Comm </span><strong id="psmPreviewComm" style="color:var(--green-mid)"></strong></span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-sm" onclick="psmClearProduct()"><i class="ti ti-arrow-left"></i> Back</button>
+          <button class="btn btn-primary" style="flex:1" onclick="psmAddSale()">Add sale</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <button class="btn" style="flex:1" onclick="closePastShiftModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" onclick="savePastShift()">Save shift</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
