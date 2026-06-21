@@ -854,6 +854,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <button class="btn btn-sm" onclick="loadAdminPanel()"><i class="ti ti-refresh" style="margin-right:4px"></i>Refresh</button>
       </div>
       <div id="adminUserList"><div style="color:var(--text3);font-size:13px">Loading…</div></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">Data tools</div>
+        <button class="btn btn-sm" id="recalcBtn" onclick="recalcCommissions()" style="width:100%">
+          <i class="ti ti-calculator" style="margin-right:5px"></i>Recalculate commissions for all users
+        </button>
+        <div id="recalcResult" style="font-size:12px;margin-top:8px;color:var(--text3)"></div>
+      </div>
     </div>
   </div>
 
@@ -2436,6 +2443,27 @@ async function loadAdminPanel() {
       </div>`).join('');
   } catch {
     el.innerHTML = '<div class="empty-state" style="border:none">Could not load — server may be offline.</div>';
+  }
+}
+
+async function recalcCommissions() {
+  const btn = document.getElementById('recalcBtn');
+  const result = document.getElementById('recalcResult');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader" style="margin-right:5px"></i>Recalculating…';
+  result.textContent = '';
+  try {
+    const data = await apiPost('/api/admin/recalc-commissions');
+    if (!data) { result.textContent = 'Failed — session may have expired.'; return; }
+    result.style.color = 'var(--green-mid)';
+    result.textContent = `Done — ${data.usersProcessed} users, ${data.shiftsUpdated} shifts updated, ${data.salesUpdated} sales recalculated.`;
+    historyCache = null; // force fresh load so current user sees updated numbers
+  } catch {
+    result.style.color = 'var(--red-mid, #ef4444)';
+    result.textContent = 'Error — check server logs.';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-calculator" style="margin-right:5px"></i>Recalculate commissions for all users';
   }
 }
 

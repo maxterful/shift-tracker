@@ -222,6 +222,66 @@ app.put('/api/me/history/:id', auth, (req, res) => {
   res.json({ ok: true, entry: h[idx] });
 });
 
+// ── Commission logic (mirrored from client) ───────────────
+const COMM_RATES = {
+  admission:     { Premier: 0.005,  'Non-Premier': 0.0045, UPH: 0.0055 },
+  express:       { Premier: 0.015,  'Non-Premier': 0.01,   UPH: 0.015  },
+  upgrades:      { Premier: 0.0125, 'Non-Premier': 0.01,   UPH: 0.0225 },
+  vipPrivate:    { Premier: 0.025,  'Non-Premier': 0.025,  UPH: 0.025  },
+  vipNonPrivate: { Premier: 0.025,  'Non-Premier': 0.02,   UPH: 0.025  },
+  lanyards:      { Premier: 0.03,   'Non-Premier': 0.03,   UPH: 0.03   },
+  ancillary:     { Premier: 0.0125, 'Non-Premier': 0.0125, UPH: 0.0175 },
+  thirdParty:    { Premier: 0.01,   'Non-Premier': 0.01,   UPH: 0.01   },
+  none:          { Premier: 0,      'Non-Premier': 0,       UPH: 0      },
+};
+function commTypeFor(product) {
+  if (product.includes('VIP TOUR: PRIVATE'))     return 'vipPrivate';
+  if (product.includes('VIP TOUR: NON-PRIVATE')) return 'vipNonPrivate';
+  if (product.includes('EXPRESS'))               return 'express';
+  if (product.includes('LANYARD') || product === 'POUCH ONLY' || product === 'EVENT LANYARD') return 'lanyards';
+  if (product.includes('CONV'))                  return 'upgrades';
+  if (product === 'SeaWorld 1D' || product.includes('I-RIDE')) return 'thirdParty';
+  if (product.includes('PARKING') || product.includes('Superstar Shuttle')) return 'none';
+  if (product.includes('PHOTOS') || product.includes('CABANA') ||
+      product.includes('PREMIUM SEATING') || product.includes('FREESTYLE') ||
+      product.includes('DARKMOOR') || product.includes('BREAKFAST') ||
+      product.includes('CHARACTER DINING') || product.includes('HHN')) return 'ancillary';
+  if (product === 'USF/IOA 1D Base AD' || product === 'USF/IOA 1D Base CH' ||
+      product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH') return 'none';
+  return 'admission';
+}
+function calcCommission(product, preTax, tier) {
+  const rate = (COMM_RATES[commTypeFor(product)] || COMM_RATES.none)[tier] ?? 0;
+  return Math.round(preTax * rate * 100) / 100;
+}
+
+// ── Admin: recalculate commissions for all users ──────────
+app.post('/api/admin/recalc-commissions', adminAuth, (_req, res) => {
+  const users = read(path.join(DATA, 'users.json'), []);
+  let shiftsUpdated = 0, salesUpdated = 0;
+  users.forEach(user => {
+    const f = path.join(DATA, 'users', user.id, 'history.json');
+    const history = read(f, []);
+    let changed = false;
+    history.forEach(shift => {
+      const tier = shift.hotelTier || 'Premier';
+      const sales = (shift.sales || []).map(sale => {
+        const preTax = sale.preTax ?? (sale.amount / 1.065);
+        const newComm = calcCommission(sale.product || '', preTax, tier);
+        if (newComm !== sale.commission) { salesUpdated++; changed = true; }
+        return { ...sale, commission: newComm };
+      });
+      if (changed) {
+        shift.sales = sales;
+        shift.totalCommission = Math.round(sales.reduce((a, s) => a + (s.commission || 0), 0) * 100) / 100;
+        shiftsUpdated++;
+      }
+    });
+    if (changed) write(f, history);
+  });
+  res.json({ ok: true, shiftsUpdated, salesUpdated, usersProcessed: users.length });
+});
+
 // ── Insights: top products + hourly data across all users ─
 app.get('/api/insights', (_req, res) => {
   const users = read(path.join(DATA, 'users.json'), []);
