@@ -379,6 +379,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .lb-row.gold { border-left-color: #F59E0B; }
 .lb-row.silver { border-left-color: #9CA3AF; }
 .lb-row.bronze { border-left-color: #B45309; }
+.lb-row-dim { opacity: 0.6; }
 .lb-rank { font-size: 18px; min-width: 28px; text-align: center; }
 .lb-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
 .lb-info { flex: 1; min-width: 0; }
@@ -725,6 +726,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div class="past-stat"><div class="past-stat-val" id="pastStatBest">$0</div><div class="past-stat-lbl">Best shift</div></div>
         <div class="past-stat"><div class="past-stat-val" id="pastStatTx">0</div><div class="past-stat-lbl">Total sales</div></div>
         <div class="past-stat"><div class="past-stat-val" id="pastStatGuests">0</div><div class="past-stat-lbl">Total guests</div></div>
+        <div class="past-stat"><div class="past-stat-val" id="pastStatComm" style="color:var(--green-mid)">$0</div><div class="past-stat-lbl">Total commission</div></div>
       </div>
       <div class="section-title" style="margin-top:14px;margin-bottom:10px">Personal records</div>
       <div id="personalRecords" style="font-size:13px;color:var(--text2)">—</div>
@@ -790,19 +792,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <input type="number" id="goalInput" placeholder="e.g. 2000" min="0" inputmode="decimal" oninput="updateGoal()">
         </div>
         <div class="input-group" style="margin-bottom:0">
+          <label>Commission goal ($)</label>
+          <input type="number" id="commGoalInput" placeholder="e.g. 50" min="0" inputmode="decimal" oninput="updateCommGoal()">
+        </div>
+      </div>
+      <div class="input-row" style="margin-top:10px">
+        <div class="input-group" style="margin-bottom:0">
           <label>Occupancy (%)</label>
           <input type="number" id="occInput" placeholder="e.g. 80" min="0" max="100" inputmode="decimal" oninput="updateOcc()">
         </div>
-      </div>
-      <div class="input-group" style="margin-top:10px">
-        <label>Occupancy type</label>
-        <select id="occTypeSelect" onchange="updateOcc()">
-          <option value="Hotel">Hotel</option>
-          <option value="Resort">Resort</option>
-          <option value="Cruise ship">Cruise ship</option>
-          <option value="Timeshare">Timeshare</option>
-          <option value="Other">Other</option>
-        </select>
+        <div class="input-group" style="margin-bottom:0">
+          <label>Occupancy type</label>
+          <select id="occTypeSelect" onchange="updateOcc()">
+            <option value="Hotel">Hotel</option>
+            <option value="Resort">Resort</option>
+            <option value="Cruise ship">Cruise ship</option>
+            <option value="Timeshare">Timeshare</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -1124,7 +1132,7 @@ function lsSet(key, v)  { try { localStorage.setItem(key, JSON.stringify(v)); } 
 let state = {
   sales: [], guestsExtra: 0, goal: 0, occ: null, occType: 'Hotel',
   hotelTier: 'Premier', hotel: null, taxRate: 6.5, priceIncludesTax: true,
-  selectedProduct: null, shiftStart: Date.now(), shiftOpen: true, notes: '', updatedAt: 0
+  selectedProduct: null, shiftStart: Date.now(), shiftOpen: true, notes: '', commGoal: 0, updatedAt: 0
 };
 let prodChart = null, timeChart = null;
 let historyCache = null;
@@ -1444,7 +1452,7 @@ async function enterApp(freshLogin = false) {
       syncUIToState();
       render();
     }
-    recoverClosedShiftIfNeeded(); // auto-save any shift that ended but failed to sync
+    await recoverClosedShiftIfNeeded(); // auto-save any shift that ended but failed to sync
   } catch {
     setSyncUI('offline', 'Local only');
   }
@@ -1484,6 +1492,7 @@ function buildHotelSelect() {
 
 function syncUIToState() {
   document.getElementById('goalInput').value          = state.goal || '';
+  document.getElementById('commGoalInput').value      = state.commGoal || '';
   document.getElementById('occInput').value           = state.occ != null ? state.occ : '';
   document.getElementById('occTypeSelect').value      = state.occType || 'Hotel';
   document.getElementById('shiftNotes').value         = state.notes || '';
@@ -1521,7 +1530,14 @@ function render() {
 
   document.getElementById('totalSales').textContent  = fmtD(total);
   document.getElementById('salesSub').textContent    = txCount+' ticket'+(txCount!==1?'s':'')+' · '+saleCount+' sale'+(saleCount!==1?'s':'');
-  document.getElementById('totalCommission').textContent = txCount ? 'Commission: '+fmtD(totalComm) : '';
+  if (txCount) {
+    const cg = state.commGoal || 0;
+    const commPct = cg > 0 ? Math.round((totalComm / cg) * 100) : null;
+    document.getElementById('totalCommission').textContent =
+      'Commission: ' + fmtD(totalComm) + (cg > 0 ? ' / ' + fmtD(cg) + ' goal (' + commPct + '%)' : '');
+  } else {
+    document.getElementById('totalCommission').textContent = '';
+  }
   if (goalPct !== null) {
     document.getElementById('goalPct').textContent   = Math.round(goalPct)+'%';
     document.getElementById('goalBar').style.width   = Math.min(goalPct,100)+'%';
@@ -1698,13 +1714,14 @@ async function renderPastShifts() {
       <div class="shc-sales-list" id="shcSales_${sid}">${salesRows}</div>`:''}
     </div>`;
   }).join('');
-  const agg=history.reduce((a,h)=>({total:a.total+h.totalSales,tx:a.tx+h.txCount,g:a.g+h.totalGuests}),{total:0,tx:0,g:0});
+  const agg=history.reduce((a,h)=>({total:a.total+h.totalSales,tx:a.tx+h.txCount,g:a.g+h.totalGuests,comm:a.comm+(h.totalCommission||0)}),{total:0,tx:0,g:0,comm:0});
   document.getElementById('pastStatShifts').textContent=history.length;
   document.getElementById('pastStatTotal').textContent=fmt(agg.total);
   document.getElementById('pastStatAvg').textContent=fmt(history.length?agg.total/history.length:0);
   document.getElementById('pastStatBest').textContent=fmt(bestShift);
   document.getElementById('pastStatTx').textContent=agg.tx;
   document.getElementById('pastStatGuests').textContent=agg.g;
+  document.getElementById('pastStatComm').textContent=fmtD(agg.comm);
   // Personal records
   const bestSale = history.reduce((a,h)=>{
     const top=(h.sales||[]).reduce((b,s)=>Math.max(b,s.amount||0),0);
@@ -1712,11 +1729,19 @@ async function renderPastShifts() {
   },0);
   const bestComm = history.reduce((a,h)=>Math.max(a,h.totalCommission||0),0);
   const bestTx   = history.reduce((a,h)=>Math.max(a,h.txCount||0),0);
+  // Goal streak: count consecutive most-recent shifts above goal (goal must be set)
+  let goalStreak = 0;
+  for (const h of [...history].sort((a,b)=>(b.shiftEnd||0)-(a.shiftEnd||0))) {
+    if (!h.goal || h.goal <= 0) break;
+    if (h.totalSales >= h.goal) goalStreak++; else break;
+  }
+  const streakStr = goalStreak >= 2 ? '🔥 ' + goalStreak + ' shifts in a row' : goalStreak === 1 ? '✅ Hit goal last shift' : '—';
   document.getElementById('personalRecords').innerHTML = [
     { icon:'🏆', label:'Best shift', val: fmt(bestShift) },
     { icon:'💰', label:'Best commission', val: fmtD(bestComm) },
     { icon:'🎟', label:'Most tickets (shift)', val: bestTx },
     { icon:'💎', label:'Biggest single sale', val: fmtD(bestSale) },
+    { icon:'🎯', label:'Goal streak', val: streakStr },
   ].map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border2)">
     <span>${r.icon} ${r.label}</span><strong>${r.val}</strong>
   </div>`).join('');
@@ -1730,22 +1755,35 @@ async function renderLeaderboard() {
   el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
   try {
     const raw = await apiGet('/api/leaderboard?period=' + lbPeriod);
-    const board = (raw || []).filter(r => r.shiftCount > 0);
+    const all = raw || [];
+    // Always include self; others only if they have shifts
+    const board = all.filter(r => r.shiftCount > 0 || r.user.id === currentUser?.id);
     if (!board.length) { el.innerHTML='<div class="empty-state">No completed shifts for this period — end a shift to appear here!</div>'; return; }
     const medals = ['🥇','🥈','🥉'];
     const rankClass = i => i===0?'gold':i===1?'silver':i===2?'bronze':'';
-    el.innerHTML = board.map((row,i) => {
+    // Ranked rows: only count users with actual shifts for ranking
+    const ranked = board.filter(r => r.shiftCount > 0);
+    const teamTotal = ranked.reduce((a, r) => a + r.totalSales, 0);
+    const teamShifts = ranked.reduce((a, r) => a + r.shiftCount, 0);
+    const teamTx = ranked.reduce((a, r) => a + r.txCount, 0);
+    const teamSummary = teamShifts > 0
+      ? `<div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          Team · ${teamShifts} shift${teamShifts!==1?'s':''} · ${teamTx} ticket${teamTx!==1?'s':''} · <strong style="color:var(--text2)">${fmt(teamTotal)} total</strong>
+        </div>` : '';
+    el.innerHTML = teamSummary + board.map((row, i) => {
       const isMe = row.user.id === currentUser?.id;
-      return `<div class="lb-row ${rankClass(i)}${isMe?' me':''}">
-        <div class="lb-rank">${medals[i] ?? (i+1)}</div>
+      const rank = ranked.indexOf(row);
+      const noShifts = row.shiftCount === 0;
+      return `<div class="lb-row ${rank>=0?rankClass(rank):''}${isMe?' me':''}${noShifts?' lb-row-dim':''}">
+        <div class="lb-rank">${noShifts ? '—' : (medals[rank] ?? (rank+1))}</div>
         <div class="lb-avatar" style="background:${row.user.color}22;border:2px solid ${row.user.color}44">${row.user.emoji}</div>
         <div class="lb-info">
           <div class="lb-name">${row.user.name}${isMe?'<span class="you-tag">YOU</span>':''}</div>
-          <div class="lb-sub">${row.shiftCount} shift${row.shiftCount!==1?'s':''} · ${row.txCount} sale${row.txCount!==1?'s':''} · Avg ${fmt(row.avgPerShift)}</div>
+          <div class="lb-sub">${noShifts ? 'No shifts this period' : `${row.shiftCount} shift${row.shiftCount!==1?'s':''} · ${row.txCount} sale${row.txCount!==1?'s':''} · Avg ${fmt(row.avgPerShift)}`}</div>
         </div>
         <div class="lb-stats">
-          <div class="lb-total">${fmt(row.totalSales)}</div>
-          <div class="lb-detail">${row.conv!==null?row.conv+'% conv':'—'} · Best ${fmt(row.bestShift)}</div>
+          <div class="lb-total">${noShifts ? '—' : fmt(row.totalSales)}</div>
+          <div class="lb-detail">${noShifts ? '' : `${row.conv!==null?row.conv+'% conv':'—'} · Best ${fmt(row.bestShift)}`}</div>
         </div>
       </div>`;
     }).join('');
@@ -2343,6 +2381,7 @@ function deleteSale(i) { if(confirm('Delete this sale?')){ state.sales.splice(i,
 function addGuests(n) { state.guestsExtra+=n; state.updatedAt=Date.now(); render(); scheduleSave(); }
 function promptCustomGuests() { const n=parseInt(prompt('How many guests?')); if(n&&n>0) addGuests(n); }
 function updateGoal() { state.goal=parseFloat(document.getElementById('goalInput').value)||0; state.updatedAt=Date.now(); render(); scheduleSave(); }
+function updateCommGoal() { state.commGoal=parseFloat(document.getElementById('commGoalInput').value)||0; state.updatedAt=Date.now(); render(); scheduleSave(); }
 function updateHotel() {
   const hotel = document.getElementById('hotelSelect').value;
   state.hotel = hotel || null;
