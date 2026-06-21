@@ -124,6 +124,18 @@ app.get('/api/admin/users', adminAuth, (_req, res) => {
   }));
 });
 
+// ── Admin: full history for a specific user ────────────────
+app.get('/api/admin/users/:id/history', adminAuth, (req, res) => {
+  const f = path.join(DATA, 'users', req.params.id, 'history.json');
+  res.json(read(f, []));
+});
+
+// ── Admin: current state for a specific user ───────────────
+app.get('/api/admin/users/:id/state', adminAuth, (req, res) => {
+  const f = path.join(DATA, 'users', req.params.id, 'state.json');
+  res.json(read(f, null));
+});
+
 // ── Admin: delete user ────────────────────────────────────
 app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
   if (req.params.id === req.uid) return res.status(400).json({ error: 'Cannot delete yourself' });
