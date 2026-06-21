@@ -529,11 +529,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <span class="sync-dot" id="syncDot"></span>
           <span id="syncLabel">Connecting…</span>
         </div>
+        <span class="stat-chip" id="weatherChip" style="display:none"></span>
       </div>
     </div>
     <div class="header-actions">
       <span class="badge badge-open" id="shiftBadge">● Open</span>
       <button class="btn btn-danger" id="endShiftBtn" onclick="endShift()">End shift</button>
+      <button class="btn" onclick="openExportModal(null)" title="Share shift card"><i class="ti ti-share"></i></button>
       <button class="btn" onclick="resetAll()">New shift</button>
       <button class="btn" onclick="logOut()" title="Log out" style="padding:0 10px;font-size:18px;line-height:1">⏻</button>
     </div>
@@ -567,6 +569,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="metric-value" id="occDisplay">—</div>
       <div class="metric-sub" id="occTypeDisplay">Set in Setup</div>
     </div>
+    <div class="metric-card" id="salesPaceCard" style="display:none;background:var(--bg2)">
+      <div class="metric-label">Sales pace</div>
+      <div class="metric-value" id="salesPaceVal">—</div>
+      <div class="metric-sub" id="salesPaceSub">On pace for…</div>
+    </div>
+  </div>
+
+  <div id="announcementBanner" style="display:none;background:#D97706;color:#fff;border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-bottom:12px;gap:8px;align-items:flex-start">
+    <i class="ti ti-speakerphone" style="margin-top:1px;flex-shrink:0"></i>
+    <span id="announcementText"></span>
   </div>
 
   <div class="tabs-wrap">
@@ -652,6 +664,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <i class="ti ti-refresh" style="margin-right:5px"></i><span id="repeatBtnLabel">Repeat last sale</span>
       </button>
     </div>
+  </div>
+  <div class="card" id="parkHoursCard" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="section-title" style="margin:0">Park hours today</div>
+      <span id="parkHoursDate" style="font-size:11px;color:var(--text3)"></span>
+    </div>
+    <div id="parkHoursList" style="display:flex;flex-direction:column;gap:6px"></div>
   </div>
 
   <!-- GUESTS -->
@@ -859,13 +878,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
     <div class="card">
       <div class="section-title">Account</div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
         <button class="btn" style="flex:1" onclick="switchUser()">
           <i class="ti ti-switch-horizontal" style="margin-right:6px"></i>Switch user
         </button>
         <button class="btn btn-danger" style="flex:1" onclick="logOut()">
           <i class="ti ti-logout" style="margin-right:6px"></i>Log out
         </button>
+      </div>
+      <div style="border-top:0.5px solid var(--border);padding-top:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">Change PIN</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <input type="password" id="pinCurrent" placeholder="Current 4-digit PIN" maxlength="4" inputmode="numeric" style="font-size:14px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;outline:none">
+          <input type="password" id="pinNew" placeholder="New 4-digit PIN" maxlength="4" inputmode="numeric" style="font-size:14px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;outline:none">
+          <input type="password" id="pinConfirm" placeholder="Confirm new PIN" maxlength="4" inputmode="numeric" style="font-size:14px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;outline:none">
+          <button class="btn btn-primary" onclick="changePin()">Update PIN</button>
+          <div id="pinChangeMsg" style="font-size:12px;min-height:16px;margin-top:2px"></div>
+        </div>
       </div>
     </div>
     <div class="card" id="claimAdminCard">
@@ -889,6 +918,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <i class="ti ti-calculator" style="margin-right:5px"></i>Recalculate commissions for all users
         </button>
         <div id="recalcResult" style="font-size:12px;margin-top:8px;color:var(--text3)"></div>
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">
+          <i class="ti ti-speakerphone" style="margin-right:4px"></i>Daily announcement
+        </div>
+        <textarea id="adminAnnouncement" rows="2" placeholder="Message for the whole team (shown on dashboard at login)…" style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+        <button class="btn btn-sm btn-primary" onclick="saveAnnouncement()" style="margin-top:6px">Post announcement</button>
+        <div id="annSaveMsg" style="font-size:12px;color:var(--green-mid);min-height:16px;margin-top:4px"></div>
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:0.5px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:6px">
+          <i class="ti ti-tag" style="margin-right:4px"></i>Product price editor
+        </div>
+        <div id="priceEditorList" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+        <button class="btn btn-sm btn-primary" onclick="savePrices()" style="margin-top:8px">Save prices</button>
+        <div id="priceSaveMsg" style="font-size:12px;color:var(--green-mid);min-height:16px;margin-top:4px"></div>
       </div>
     </div>
   </div>
@@ -1486,6 +1531,139 @@ async function enterApp(freshLogin = false) {
 
   // Show shift setup on fresh PIN login
   if (freshLogin) openShiftSetupModal();
+
+  // Load park info + weather + announcement (non-blocking)
+  fetchParkInfo();
+  fetchAnnouncement();
+}
+
+// ── Park info + weather ──────────────────────────────────────
+async function fetchParkInfo() {
+  try {
+    const data = await apiGet('/api/park-info');
+    if (!data) return;
+    const { weather, parkHours } = data;
+    if (weather) {
+      const chip = document.getElementById('weatherChip');
+      chip.textContent = `${weather.icon} ${weather.temp}°F`;
+      chip.title = `Feels like ${weather.feels}°F`;
+      chip.style.display = '';
+    }
+    if (parkHours && parkHours.length) {
+      const card = document.getElementById('parkHoursCard');
+      const list = document.getElementById('parkHoursList');
+      const dateLabel = document.getElementById('parkHoursDate');
+      dateLabel.textContent = new Date().toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+      list.innerHTML = parkHours.map(p => {
+        const hours = p.open ? `${p.open} – ${p.close}` : 'Closed';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+          <span style="font-weight:600;color:var(--text)">${p.name.replace('Universal ', '').replace("Islands of Adventure","Islands of Adventure")}</span>
+          <span style="color:${p.open ? 'var(--green-mid)' : 'var(--red-mid)'}">${hours}</span>
+        </div>`;
+      }).join('');
+      card.style.display = '';
+    }
+  } catch {}
+}
+
+// ── Admin announcement ───────────────────────────────────────
+async function fetchAnnouncement() {
+  try {
+    const ann = await apiGet('/api/announcement');
+    if (ann && ann.text) {
+      document.getElementById('announcementText').textContent = ann.text;
+      document.getElementById('announcementBanner').style.display = 'flex';
+    }
+    if (ann && document.getElementById('adminAnnouncement'))
+      document.getElementById('adminAnnouncement').value = ann.text || '';
+  } catch {}
+}
+async function saveAnnouncement() {
+  const text = document.getElementById('adminAnnouncement').value.trim();
+  const msg = document.getElementById('annSaveMsg');
+  try {
+    const r = await apiFetch('/api/announcement', { method: 'PUT', body: JSON.stringify({ text }) });
+    if (r) { msg.textContent = 'Posted!'; msg.style.color = 'var(--green-mid)'; }
+    else    { msg.textContent = 'Failed'; msg.style.color = 'var(--red-mid)'; }
+  } catch { msg.textContent = 'Error'; msg.style.color = 'var(--red-mid)'; }
+  setTimeout(() => { msg.textContent = ''; }, 3000);
+}
+
+// ── Change PIN ───────────────────────────────────────────────
+async function changePin() {
+  const cur = document.getElementById('pinCurrent').value.trim();
+  const nw  = document.getElementById('pinNew').value.trim();
+  const cf  = document.getElementById('pinConfirm').value.trim();
+  const msg = document.getElementById('pinChangeMsg');
+  if (!cur || !nw || !cf) { msg.textContent = 'Fill in all fields.'; msg.style.color = 'var(--red-mid)'; return; }
+  if (nw !== cf) { msg.textContent = "New PINs don't match."; msg.style.color = 'var(--red-mid)'; return; }
+  if (nw.length !== 4 || !/^\d{4}$/.test(nw)) { msg.textContent = 'PIN must be exactly 4 digits.'; msg.style.color = 'var(--red-mid)'; return; }
+  try {
+    const r = await apiFetch('/api/me/pin', { method: 'POST', body: JSON.stringify({ currentPin: cur, newPin: nw }) });
+    if (r && r.ok) {
+      msg.textContent = 'PIN updated!'; msg.style.color = 'var(--green-mid)';
+      document.getElementById('pinCurrent').value = document.getElementById('pinNew').value = document.getElementById('pinConfirm').value = '';
+    } else {
+      msg.textContent = (r && r.error) || 'Failed.'; msg.style.color = 'var(--red-mid)';
+    }
+  } catch { msg.textContent = 'Error.'; msg.style.color = 'var(--red-mid)'; }
+  setTimeout(() => { msg.textContent = ''; }, 4000);
+}
+
+// ── Shift export card ────────────────────────────────────────
+function openExportModal(entry) {
+  const e = entry || (() => {
+    if (!state.sales.length) return null;
+    const s = state.sales, total = Math.round(s.reduce((a,x)=>a+x.amount,0)*100)/100;
+    return { name: currentUser?.name, emoji: currentUser?.emoji, date: new Date(state.shiftStart).toLocaleDateString([], {weekday:'short',month:'short',day:'numeric'}),
+      totalSales: total, goal: state.goal, txCount: s.reduce((a,x)=>a+x.guests,0),
+      totalGuests: (state.guestsExtra||0)+s.reduce((a,x)=>a+x.guests,0),
+      hotel: state.hotel, duration: Date.now()-state.shiftStart };
+  })();
+  if (!e) return;
+  document.getElementById('ec-name').textContent  = e.name || currentUser?.name || '';
+  document.getElementById('ec-emoji').textContent = e.emoji || currentUser?.emoji || '😎';
+  document.getElementById('ec-meta').textContent  = e.date || '';
+  document.getElementById('ec-sales').textContent = '$' + (e.totalSales||0).toFixed(2);
+  const goalEl = document.getElementById('ec-goal');
+  if (e.goal > 0) {
+    const pct = Math.round((e.totalSales||0)/e.goal*100);
+    goalEl.textContent = pct + '%';
+    goalEl.style.color = pct >= 100 ? '#34d399' : '#f59e0b';
+  } else { goalEl.textContent = '—'; goalEl.style.color = '#94a3b8'; }
+  document.getElementById('ec-tx').textContent   = `${e.txCount||0} sales`;
+  const conv = e.totalGuests > 0 ? Math.round((e.txCount||0)/e.totalGuests*100) : 0;
+  document.getElementById('ec-conv').textContent  = `${conv}% conv`;
+  document.getElementById('ec-hotel').textContent = e.hotel || 'No hotel';
+  const dur = e.duration ? Math.round(e.duration/60000) : 0;
+  document.getElementById('ec-duration').textContent = dur >= 60 ? `${Math.floor(dur/60)}h ${dur%60}m` : `${dur}m`;
+  document.getElementById('exportModal').style.display = 'flex';
+}
+function closeExportModal() { document.getElementById('exportModal').style.display = 'none'; }
+
+// ── Product price editor ─────────────────────────────────────
+function buildPriceEditor() {
+  const list = document.getElementById('priceEditorList');
+  if (!list) return;
+  const allProducts = PRODUCT_CATEGORIES.flatMap(c => c.products || []);
+  const shown = [...new Set(allProducts)].filter(p => PRODUCT_PRICES[p] !== undefined);
+  list.innerHTML = shown.map(p =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px">
+      <span style="flex:1;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p}">${p}</span>
+      <input type="number" data-product="${p}" value="${PRODUCT_PRICES[p]}" min="0" step="0.01" inputmode="decimal"
+        style="width:70px;font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--border2);background:var(--bg);color:var(--text);text-align:right">
+    </div>`
+  ).join('');
+}
+function savePrices() {
+  const msg = document.getElementById('priceSaveMsg');
+  document.querySelectorAll('#priceEditorList input[data-product]').forEach(inp => {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v) && v >= 0) PRODUCT_PRICES[inp.dataset.product] = v;
+  });
+  msg.textContent = 'Prices updated (this session only — ask dev to persist)';
+  msg.style.color = 'var(--green-mid)';
+  setTimeout(() => { msg.textContent = ''; }, 5000);
 }
 
 async function logOut() {
@@ -1579,6 +1757,21 @@ function render() {
   } else {
     document.getElementById('goalPct').textContent   = '—';
     document.getElementById('goalSub').textContent   = 'Set goal in Setup';
+  }
+  // Sales pace
+  if (state.shiftOpen && txCount >= 2) {
+    const elapsedHrs = (Date.now() - state.shiftStart) / 3600000;
+    if (elapsedHrs > 0.083) { // at least 5 min in
+      const pace = total / elapsedHrs;
+      const remaining8h = Math.max(0, 8 - elapsedHrs);
+      const projected = total + pace * remaining8h;
+      const paceCard = document.getElementById('salesPaceCard');
+      paceCard.style.display = '';
+      document.getElementById('salesPaceVal').textContent = '$' + Math.round(pace) + '/hr';
+      document.getElementById('salesPaceSub').textContent = 'Proj. 8h: $' + Math.round(projected);
+    }
+  } else {
+    document.getElementById('salesPaceCard').style.display = 'none';
   }
   document.getElementById('totalGuests').textContent  = totalGuests;
   document.getElementById('convRate').textContent     = conv!==null?'Conversion: '+conv+'%':'Conversion: —';
@@ -1746,6 +1939,7 @@ async function renderPastShifts() {
         </div>
         <div class="shc-actions">
           <button class="btn btn-sm" onclick="enterPastEditMode(${sid},'${h.date}')"><i class="ti ti-plus"></i></button>
+          <button class="btn btn-sm" onclick='openExportModal(${JSON.stringify({name:currentUser?.name,emoji:currentUser?.emoji,date:h.date,totalSales:h.totalSales,goal:h.goal,txCount:h.txCount,totalGuests:h.totalGuests,hotel:h.hotel,duration:h.duration})})' title="Share card"><i class="ti ti-share"></i></button>
           <button class="btn btn-sm" onclick="exportHistoryCSV(${sid},${i})">CSV</button>
           <button class="trash-btn" onclick="deleteHistoryEntry(${sid},${i})"><i class="ti ti-trash"></i></button>
         </div>
@@ -2634,6 +2828,8 @@ async function loadAdminPanel() {
   const el = document.getElementById('adminUserList');
   if (!el) return;
   el.innerHTML = '<div style="color:var(--text3);font-size:13px">Loading…</div>';
+  buildPriceEditor();
+  fetchAnnouncement();
   try {
     const users = await apiGet('/api/admin/users');
     if (!users?.length) { el.innerHTML = '<div class="empty-state" style="border:none">No users.</div>'; return; }
@@ -2753,6 +2949,41 @@ setInterval(updateTimer,1000);
   }
 })();
 </script>
+
+<!-- Shift export card modal -->
+<div class="past-shift-modal" id="exportModal" onclick="if(event.target===this)closeExportModal()" style="display:none">
+  <div class="past-shift-modal-inner" style="max-width:360px">
+    <div class="psm-title">Shift summary card</div>
+    <div id="exportCard" style="background:linear-gradient(135deg,#1e293b 60%,#0f172a);border-radius:14px;padding:20px 22px;color:#fff;font-family:inherit;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#94a3b8;text-transform:uppercase">Shift summary</div>
+          <div style="font-size:18px;font-weight:800;margin-top:2px" id="ec-name"></div>
+        </div>
+        <div style="font-size:28px" id="ec-emoji"></div>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-bottom:10px" id="ec-meta"></div>
+      <div style="display:flex;gap:10px;margin-bottom:14px">
+        <div style="flex:1;background:rgba(255,255,255,.07);border-radius:8px;padding:10px 12px">
+          <div style="font-size:11px;color:#94a3b8">Total sales</div>
+          <div style="font-size:22px;font-weight:800;color:#34d399" id="ec-sales"></div>
+        </div>
+        <div style="flex:1;background:rgba(255,255,255,.07);border-radius:8px;padding:10px 12px">
+          <div style="font-size:11px;color:#94a3b8">vs. goal</div>
+          <div style="font-size:22px;font-weight:800" id="ec-goal"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="background:rgba(255,255,255,.07);border-radius:6px;padding:6px 10px;font-size:12px" id="ec-tx"></div>
+        <div style="background:rgba(255,255,255,.07);border-radius:6px;padding:6px 10px;font-size:12px" id="ec-conv"></div>
+        <div style="background:rgba(255,255,255,.07);border-radius:6px;padding:6px 10px;font-size:12px" id="ec-hotel"></div>
+        <div style="background:rgba(255,255,255,.07);border-radius:6px;padding:6px 10px;font-size:12px" id="ec-duration"></div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--text3);margin:0 0 10px">Take a screenshot to share your shift!</p>
+    <button class="btn" style="width:100%" onclick="closeExportModal()">Close</button>
+  </div>
+</div>
 
 <!-- Past shift logging modal -->
 <div class="past-shift-modal" id="pastShiftModal" onclick="if(event.target===this)closePastShiftModal()">

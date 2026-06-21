@@ -2,6 +2,17 @@ const express = require('express');
 const fs      = require('fs');
 const path    = require('path');
 const crypto  = require('crypto');
+const https   = require('https');
+
+function httpGet(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { headers: { 'User-Agent': 'shift-tracker/1.0' } }, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+    }).on('error', reject);
+  });
+}
 
 const app  = express();
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -404,6 +415,69 @@ app.get('/api/hotel-leaderboard', (_req, res) => {
     .sort((a, b) => b.totalSales - a.totalSales);
 
   res.json(board);
+});
+
+// ── Park info: weather + hours (cached 30 min) ────────────
+let _parkCache = null, _parkCacheTs = 0;
+const WX_CODE = code => {
+  if (code === 0) return '☀️';
+  if (code <= 3)  return '⛅';
+  if (code <= 48) return '🌫️';
+  if (code <= 67) return '🌧️';
+  if (code <= 82) return '🌦️';
+  return '⛈️';
+};
+app.get('/api/park-info', async (_req, res) => {
+  if (_parkCache && Date.now() - _parkCacheTs < 30 * 60 * 1000)
+    return res.json(_parkCache);
+  try {
+    const [wx, dest] = await Promise.all([
+      httpGet('https://api.open-meteo.com/v1/forecast?latitude=28.5383&longitude=-81.3792&current=temperature_2m,apparent_temperature,weather_code&temperature_unit=fahrenheit&timezone=America%2FNew_York'),
+      httpGet('https://api.themeparks.wiki/v1/destination/universalorlando'),
+    ]);
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+    const parks = (dest.parks || []);
+    const schedules = await Promise.all(parks.map(p =>
+      httpGet(`https://api.themeparks.wiki/v1/entity/${p.id}/schedule`).catch(() => null)
+    ));
+    const fmt = t => t ? new Date(t).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) : null;
+    const parkHours = parks.map((p, i) => {
+      const op = (schedules[i]?.schedule || []).find(s => s.date === today && s.type === 'OPERATING');
+      return { name: p.name, open: fmt(op?.openingTime), close: fmt(op?.closingTime) };
+    });
+    _parkCache = {
+      weather: { temp: Math.round(wx.current.temperature_2m), feels: Math.round(wx.current.apparent_temperature), icon: WX_CODE(wx.current.weather_code) },
+      parkHours,
+      fetchedAt: Date.now(),
+    };
+    _parkCacheTs = Date.now();
+    res.json(_parkCache);
+  } catch(e) {
+    res.status(502).json({ error: String(e.message) });
+  }
+});
+
+// ── Admin announcements ────────────────────────────────────
+app.get('/api/announcement', (_req, res) => {
+  res.json(read(path.join(DATA, 'announcement.json'), { text: '', updatedAt: 0 }));
+});
+app.put('/api/announcement', adminAuth, (req, res) => {
+  const ann = { text: (req.body.text || '').trim().slice(0, 500), updatedAt: Date.now() };
+  write(path.join(DATA, 'announcement.json'), ann);
+  res.json({ ok: true, ann });
+});
+
+// ── Change PIN ─────────────────────────────────────────────
+app.post('/api/me/pin', auth, (req, res) => {
+  const { currentPin, newPin } = req.body;
+  if (!currentPin || !newPin || String(newPin).length !== 4) return res.status(400).json({ error: 'New PIN must be 4 digits' });
+  const all = read(path.join(DATA, 'users.json'), []);
+  const idx = all.findIndex(u => u.id === req.uid);
+  if (idx === -1) return res.status(404).json({ error: 'User not found' });
+  if (all[idx].pinHash !== hashPin(String(currentPin))) return res.status(401).json({ error: 'Current PIN is wrong' });
+  all[idx].pinHash = hashPin(String(newPin));
+  write(path.join(DATA, 'users.json'), all);
+  res.json({ ok: true });
 });
 
 // ── Start ─────────────────────────────────────────────────
