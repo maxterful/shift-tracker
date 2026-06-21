@@ -573,6 +573,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="metric-label">Sales pace</div>
       <div class="metric-value" id="salesPaceVal">—</div>
       <div class="metric-sub" id="salesPaceSub">On pace for…</div>
+      <div class="metric-sub" id="pbPaceChip" style="display:none;margin-top:4px;color:#F59E0B;font-weight:700"></div>
     </div>
   </div>
 
@@ -604,6 +605,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div style="font-weight:700;color:var(--text2);margin-bottom:4px" id="pastEditCartTitle">Cart</div>
       <div id="pastEditCartItems"></div>
       <button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%" onclick="submitPastEditCart()">Save all to shift</button>
+    </div>
+    <div id="recentProdsCard" style="display:none;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Recent</div>
+      <div id="recentProdsBtns" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
     <div class="card" id="catCard">
       <div class="section-title">Step 1 — Select category</div>
@@ -751,6 +756,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
       <div class="section-title" style="margin-top:14px;margin-bottom:10px">Personal records</div>
       <div id="personalRecords" style="font-size:13px;color:var(--text2)">—</div>
+      <div class="section-title" style="margin-top:14px;margin-bottom:10px">Recent shifts</div>
+      <div style="position:relative;height:120px"><canvas id="trendChart"></canvas></div>
     </div>
   </div>
 
@@ -1675,6 +1682,7 @@ async function logOut() {
   selectedCategory = null;
   if (prodChart) { prodChart.destroy(); prodChart = null; }
   if (timeChart) { timeChart.destroy(); timeChart = null; }
+  if (trendChartInst) { trendChartInst.destroy(); trendChartInst = null; }
   showLoginScreen();
 }
 async function switchUser() {
@@ -1758,17 +1766,21 @@ function render() {
     document.getElementById('goalPct').textContent   = '—';
     document.getElementById('goalSub').textContent   = 'Set goal in Setup';
   }
-  // Sales pace
+  // Sales pace + personal best pace alert
   if (state.shiftOpen && txCount >= 2) {
     const elapsedHrs = (Date.now() - state.shiftStart) / 3600000;
-    if (elapsedHrs > 0.083) { // at least 5 min in
+    if (elapsedHrs > 0.083) {
       const pace = total / elapsedHrs;
       const remaining8h = Math.max(0, 8 - elapsedHrs);
       const projected = total + pace * remaining8h;
-      const paceCard = document.getElementById('salesPaceCard');
-      paceCard.style.display = '';
+      document.getElementById('salesPaceCard').style.display = '';
       document.getElementById('salesPaceVal').textContent = '$' + Math.round(pace) + '/hr';
       document.getElementById('salesPaceSub').textContent = 'Proj. 8h: $' + Math.round(projected);
+      const pbChip = document.getElementById('pbPaceChip');
+      if (_personalBest > 0 && projected > _personalBest) {
+        pbChip.textContent = '🔥 On pace to beat your PB!';
+        pbChip.style.display = '';
+      } else { pbChip.style.display = 'none'; }
     }
   } else {
     document.getElementById('salesPaceCard').style.display = 'none';
@@ -1801,10 +1813,36 @@ function render() {
   } else if (goal > 0 && total < goal) {
     _goalReached = false; // reset if sales are deleted below goal
   }
-  renderProductListItems(); renderSaleList(); renderCharts(sales);
+  renderProductListItems(); renderSaleList(); renderCharts(sales); renderRecentProds();
 }
 
 let selectedCategory = null;
+
+function renderRecentProds() {
+  const card = document.getElementById('recentProdsCard');
+  const btns = document.getElementById('recentProdsBtns');
+  if (!state.sales.length || pastEditShiftId !== null) { card.style.display = 'none'; return; }
+  // Last 3 unique products in reverse order
+  const seen = new Set(), recent = [];
+  for (let i = state.sales.length - 1; i >= 0 && recent.length < 3; i--) {
+    const p = state.sales[i].product;
+    if (!seen.has(p)) { seen.add(p); recent.push(state.sales[i]); }
+  }
+  btns.innerHTML = recent.map(s => {
+    const safe = s.product.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const price = s.unitAmount || s.amount;
+    return `<button class="btn btn-sm" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="quickTap('${safe}',${price},${s.guests||1})" title="${s.product}">
+      ${s.product.length > 22 ? s.product.slice(0,22)+'…' : s.product} · ${fmtD(price)}
+    </button>`;
+  }).join('');
+  card.style.display = '';
+}
+function quickTap(product, price, guests) {
+  selectProduct(product);
+  document.getElementById('saleAmount').value = price;
+  document.getElementById('saleGuests').value = guests;
+  updateSalePreview();
+}
 
 function renderCategoryPills() {
   document.getElementById('catPills').innerHTML = PRODUCT_CATEGORIES.map(cat => {
@@ -1983,6 +2021,50 @@ async function renderPastShifts() {
   ].map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border2)">
     <span>${r.icon} ${r.label}</span><strong>${r.val}</strong>
   </div>`).join('');
+
+  // Cache personal best for pace chip
+  _personalBest = bestShift;
+
+  // Trend chart — last 10 shifts
+  const recent10 = [...history].sort((a,b)=>(a.shiftEnd||0)-(b.shiftEnd||0)).slice(-10);
+  const tcCanvas = document.getElementById('trendChart');
+  if (tcCanvas && typeof Chart !== 'undefined') {
+    if (trendChartInst) { trendChartInst.destroy(); trendChartInst = null; }
+    const labels = recent10.map(h => h.date ? h.date.replace(/\w+ /, '') : '');
+    const vals = recent10.map(h => h.totalSales || 0);
+    const goals = recent10.map(h => h.goal || null);
+    const hitGoal = vals.map((v, i) => goals[i] && v >= goals[i]);
+    trendChartInst = new Chart(tcCanvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          data: vals,
+          backgroundColor: hitGoal.map(h => h ? 'rgba(52,211,153,0.7)' : 'rgba(96,165,250,0.6)'),
+          borderRadius: 4,
+        }, {
+          type: 'line',
+          data: goals,
+          borderColor: '#F59E0B',
+          borderWidth: 1.5,
+          borderDash: [4,3],
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          callbacks: { label: ctx => '$' + ctx.parsed.y.toFixed(0) }
+        }},
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#64748b', font: { size: 10 }, callback: v => '$'+v } }
+        }
+      }
+    });
+  }
 }
 
 // ─── Leaderboard ─────────────────────────────────────────────
@@ -2158,14 +2240,25 @@ function setShiftType(t) {
 let _milestonesShown = new Set();
 let _milestoneTimer = null;
 function checkMilestones(total) {
-  if (!state.goal || state.goal <= 0) return;
-  const pct = (total / state.goal) * 100;
-  const hits = [[50,'🔥','Halfway there!',''],[75,'⚡','75% of goal!',''],[100,'🎯','Goal reached!','Amazing work!'],[150,'🚀','150% of goal!','Crushing it!']];
-  for (const [threshold, icon, msg, sub] of hits) {
-    if (pct >= threshold && !_milestonesShown.has(threshold)) {
-      _milestonesShown.add(threshold);
-      showMilestoneToast(icon, msg, sub || fmt(total)+' of '+fmt(state.goal)+' goal');
-      break;
+  // Goal % milestones
+  if (state.goal && state.goal > 0) {
+    const pct = (total / state.goal) * 100;
+    const hits = [[50,'🔥','Halfway there!',''],[75,'⚡','75% of goal!',''],[100,'🎯','Goal reached!','Amazing work!'],[150,'🚀','150% of goal!','Crushing it!']];
+    for (const [threshold, icon, msg, sub] of hits) {
+      if (pct >= threshold && !_milestonesShown.has('pct_'+threshold)) {
+        _milestonesShown.add('pct_'+threshold);
+        showMilestoneToast(icon, msg, sub || fmt(total)+' of '+fmt(state.goal)+' goal');
+        return;
+      }
+    }
+  }
+  // Dollar milestones
+  const dollarHits = [[500,'💵','$500!',''],[1000,'💰','$1,000!','Four figures 🔥'],[1500,'🤑','$1,500!',''],[2000,'🏆','$2,000!','Incredible shift!'],[2500,'🚀','$2,500!','Legendary!'],[3000,'👑','$3,000!','All-time territory!']];
+  for (const [threshold, icon, msg, sub] of dollarHits) {
+    if (total >= threshold && !_milestonesShown.has('dlr_'+threshold)) {
+      _milestonesShown.add('dlr_'+threshold);
+      showMilestoneToast(icon, msg, sub || fmt(threshold)+' in sales');
+      return;
     }
   }
 }
@@ -2178,6 +2271,10 @@ function showMilestoneToast(icon, msg, sub) {
   if (_milestoneTimer) clearTimeout(_milestoneTimer);
   _milestoneTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
+
+// ─── Personal best cache ──────────────────────────────────────
+let _personalBest = 0;
+let trendChartInst = null;
 
 // ─── Quick repeat ─────────────────────────────────────────────
 let _lastSale = null;
@@ -2761,6 +2858,7 @@ function resetAll() {
   syncUIToState(); document.getElementById('shiftNotes').value='';
   if (prodChart){prodChart.destroy();prodChart=null;}
   if (timeChart){timeChart.destroy();timeChart=null;}
+  if (trendChartInst){trendChartInst.destroy();trendChartInst=null;}
   render(); scheduleSave();
 }
 
