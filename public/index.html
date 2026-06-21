@@ -1850,6 +1850,10 @@ function openShiftSetupModal() {
   document.getElementById('setupShiftTypeB').classList.toggle('active', _setupShiftType==='B');
   document.getElementById('shiftSetupModal').style.display = 'flex';
 }
+function dismissShiftSetup() {
+  document.getElementById('shiftSetupModal').style.display = 'none';
+  switchTab('past', document.getElementById('tab-btn-past'));
+}
 function saveShiftSetup() {
   const hotel = document.getElementById('setupHotelSelect').value;
   state.hotel = hotel || null;
@@ -2692,8 +2696,11 @@ setInterval(updateTimer,1000);
 <!-- Shift setup modal (shown after login) -->
 <div class="shift-setup-modal" id="shiftSetupModal">
   <div class="shift-setup-inner">
-    <div class="shift-setup-title">Good to see you! 👋</div>
-    <div class="shift-setup-sub">Quick setup before your shift starts</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+      <div class="shift-setup-title">Good to see you! 👋</div>
+      <button onclick="dismissShiftSetup()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;padding:0 0 0 8px" title="Skip for now">✕</button>
+    </div>
+    <div class="shift-setup-sub">Quick setup before your shift starts — or skip to view stats</div>
     <div class="input-group">
       <label>Your hotel today</label>
       <select class="hotel-select" id="setupHotelSelect">
@@ -2709,6 +2716,9 @@ setInterval(updateTimer,1000);
     </div>
     <button class="btn btn-primary" style="width:100%;margin-top:20px;font-size:15px;padding:13px" onclick="saveShiftSetup()">
       <i class="ti ti-player-play" style="margin-right:6px"></i>Start shift
+    </button>
+    <button class="btn" style="width:100%;margin-top:8px;font-size:13px" onclick="dismissShiftSetup()">
+      Skip — just browsing
     </button>
   </div>
 </div>
