@@ -1582,10 +1582,10 @@ async function saveAnnouncement() {
   const text = document.getElementById('adminAnnouncement').value.trim();
   const msg = document.getElementById('annSaveMsg');
   try {
-    const r = await apiFetch('/api/announcement', { method: 'PUT', body: JSON.stringify({ text }) });
+    const r = await apiPut('/api/announcement', { text });
     if (r) { msg.textContent = 'Posted!'; msg.style.color = 'var(--green-mid)'; }
-    else    { msg.textContent = 'Failed'; msg.style.color = 'var(--red-mid)'; }
-  } catch { msg.textContent = 'Error'; msg.style.color = 'var(--red-mid)'; }
+    else    { msg.textContent = 'Failed — session may have expired'; msg.style.color = 'var(--red-mid)'; }
+  } catch(e) { msg.textContent = 'Error: ' + e.message; msg.style.color = 'var(--red-mid)'; }
   setTimeout(() => { msg.textContent = ''; }, 3000);
 }
 
