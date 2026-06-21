@@ -1393,8 +1393,8 @@ function showPinError(msg) {
 async function recoverClosedShiftIfNeeded() {
   if (state.shiftOpen !== false || !state.sales?.length) return;
   const history = await getHistory();
-  const approxEnd = state.updatedAt || state.shiftStart;
-  if (history.some(h => Math.abs((h.shiftEnd || 0) - approxEnd) < 60000)) return;
+  const approxEnd = state.shiftEnd || state.updatedAt || state.shiftStart;
+  if (history.some(h => Math.abs((h.shiftEnd || 0) - approxEnd) < 600000)) return;
   const sales = state.sales;
   const total = Math.round(sales.reduce((a, s) => a + s.amount, 0) * 100) / 100;
   const guestsSold = sales.reduce((a, s) => a + s.guests, 0);
@@ -1404,7 +1404,7 @@ async function recoverClosedShiftIfNeeded() {
     date: new Date(state.shiftStart).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
     startTime: new Date(state.shiftStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     endTime: new Date(approxEnd).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    shiftStart: state.shiftStart, shiftEnd: approxEnd,
+    shiftStart: state.shiftStart, shiftEnd: state.shiftEnd || approxEnd,
     duration: approxEnd - state.shiftStart,
     totalSales: total, txCount: guestsSold, saleCount: sales.length,
     goal: state.goal, occ: state.occ, occType: state.occType,
@@ -1938,7 +1938,7 @@ async function confirmEndShift() {
   document.getElementById('endShiftModal').style.display = 'none';
   await addToHistory(_pendingEndEntry);
   historyCache = null;
-  state.shiftOpen = false; state.updatedAt = Date.now();
+  state.shiftOpen = false; state.shiftEnd = _pendingEndEntry.shiftEnd; state.updatedAt = Date.now();
   document.getElementById('shiftBadge').textContent = '● Closed';
   document.getElementById('shiftBadge').className = 'badge badge-closed';
   document.getElementById('endShiftBtn').disabled = true;
