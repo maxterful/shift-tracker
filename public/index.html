@@ -1609,13 +1609,23 @@ function showMainApp() {
 async function enterApp(freshLogin = false) {
   showMainApp();
 
-  // Load local state immediately for instant render
+  // Render local state and boot UI immediately — never block on server
   const local = lsGet(lsStateKey(), null);
-  if (local) { state = { ...state, ...local }; syncUIToState(); render(); }
+  if (local) { state = { ...state, ...local }; syncUIToState(); }
+  if (!local) render(); else render();
+  buildHotelSelect();
+  renderCategoryPills();
+  renderTemplates();
+  updateTimer();
+  if (freshLogin) openShiftSetupModal();
 
-  // Then try server
+  // Sync with server in background; give up after 8 s
+  const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
   try {
-    const [srv, me] = await Promise.all([apiGet('/api/me/state'), apiGet('/api/me')]);
+    const [srv, me] = await Promise.race([
+      Promise.all([apiGet('/api/me/state'), apiGet('/api/me')]),
+      timeout,
+    ]);
     serverOk = true;
     setSyncUI('live', 'Synced');
     if (me) { currentUser = me; setSession(authToken, me); showAdminUI(); }
@@ -1624,19 +1634,10 @@ async function enterApp(freshLogin = false) {
       syncUIToState();
       render();
     }
-    await recoverClosedShiftIfNeeded(); // auto-save any shift that ended but failed to sync
+    await recoverClosedShiftIfNeeded();
   } catch {
     setSyncUI('offline', 'Local only');
   }
-
-  if (!local) render();
-  buildHotelSelect();
-  renderCategoryPills();
-  renderTemplates();
-  updateTimer();
-
-  // Show shift setup on fresh PIN login
-  if (freshLogin) openShiftSetupModal();
 
   // Load park info + weather + announcement (non-blocking)
   fetchParkInfo();
