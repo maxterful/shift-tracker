@@ -452,8 +452,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Mobile ───────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .app { padding: 1rem 0.85rem 5rem; }
-  .header { flex-direction: column; gap: 8px; }
-  .header-actions { width: 100%; justify-content: flex-end; }
+  .header { flex-direction: column; gap: 6px; }
+  .header-actions { width: 100%; justify-content: flex-start; flex-wrap: nowrap; gap: 6px; }
+  .header-actions .btn { flex-shrink: 0; }
+  .shift-meta { flex-wrap: wrap; row-gap: 4px; }
   .metrics { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .metric-value { font-size: 22px; }
   .input-row { grid-template-columns: 1fr; }
@@ -583,6 +585,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <span id="syncLabel">Connecting…</span>
         </div>
         <span class="stat-chip" id="weatherChip" style="display:none"></span>
+        <button id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;line-height:1;color:var(--text3)">🌙</button>
+        <button id="installBtn" onclick="triggerInstall()" title="Install app" style="display:none;background:none;border:none;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;color:var(--blue-mid);font-weight:600;font-family:inherit">+ Install</button>
       </div>
     </div>
     <div class="header-actions">
@@ -590,7 +594,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="btn btn-danger" id="endShiftBtn" onclick="endShift()">End shift</button>
       <button class="btn" onclick="openExportModal(null)" title="Share shift card" style="padding:0 10px">↗</button>
       <button class="btn" onclick="resetAll()">New shift</button>
-      <button class="btn" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="padding:0 10px;font-size:18px;line-height:1">🌙</button>
       <button class="btn" onclick="logOut()" title="Log out" style="padding:0 10px;font-size:18px;line-height:1">⏻</button>
     </div>
   </div>
@@ -3398,6 +3401,30 @@ function updateTimer() {
 }
 setInterval(updateTimer,1000);
 
+// ─── PWA install prompt ───────────────────────────────────────
+let _installPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _installPrompt = e;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = '';
+});
+window.addEventListener('appinstalled', () => {
+  _installPrompt = null;
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = 'none';
+});
+function triggerInstall() {
+  if (_installPrompt) {
+    _installPrompt.prompt();
+    _installPrompt.userChoice.then(() => { _installPrompt = null; });
+    document.getElementById('installBtn').style.display = 'none';
+  } else {
+    // iOS Safari fallback
+    alert('To install: tap the Share button ↑ then "Add to Home Screen"');
+  }
+}
+
 // ─── Theme ────────────────────────────────────────────────────
 function initTheme() {
   const saved = localStorage.getItem('theme');
@@ -3494,6 +3521,13 @@ function deleteTemplate(i) {
 // ─── PWA Service Worker ────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+// iOS: show install tip if not in standalone mode
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.navigator.standalone === true;
+if (isIOS && !isStandalone) {
+  const btn = document.getElementById('installBtn');
+  if (btn) btn.style.display = '';
 }
 </script>
 
