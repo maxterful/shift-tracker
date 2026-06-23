@@ -61,8 +61,8 @@ app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
-    "style-src 'self' 'unsafe-inline' https://unpkg.com",
-    "font-src https://unpkg.com",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+    "font-src https://cdn.jsdelivr.net https://unpkg.com",
     "img-src 'self' data:",
     "connect-src 'self'",
   ].join('; '));

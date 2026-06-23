@@ -316,13 +316,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .past-stat-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; font-weight: 500; }
 /* Calendar */
 .cal-header-cell { text-align:center; color:var(--text3); font-weight:700; padding:4px 0; }
-.cal-day { aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; position:relative; gap:2px; }
-.cal-day:hover { background:var(--bg2); }
+.cal-day { min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:5px 2px 4px; border-radius:8px; cursor:default; position:relative; gap:2px; }
+.cal-day.has-shift { cursor:pointer; }
+.cal-day.has-shift:hover { background:var(--bg2); }
 .cal-day.today { background:var(--blue-dark); }
-.cal-day.selected { outline:2px solid var(--blue-mid); }
-.cal-day.other-month { opacity:0.3; }
+.cal-day.selected { outline:2px solid var(--blue-mid); background:var(--bg2); }
+.cal-day.other-month { opacity:0.25; pointer-events:none; }
 .cal-day-num { font-size:12px; font-weight:600; line-height:1; }
-.cal-dot { width:6px; height:6px; border-radius:50%; }
+.cal-day-amt { font-size:10px; font-weight:700; line-height:1.1; margin-top:2px; }
+.cal-day-bar { width:80%; height:3px; border-radius:2px; margin-top:2px; }
 /* Milestone toast */
 .milestone-toast { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.8); background:var(--green-dark); color:#fff; border-radius:20px; padding:20px 28px; text-align:center; z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s,transform 0.25s; box-shadow:0 8px 40px rgba(0,0,0,0.4); min-width:220px; }
 .milestone-toast.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
@@ -544,7 +546,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <div class="header-actions">
       <span class="badge badge-open" id="shiftBadge">● Open</span>
       <button class="btn btn-danger" id="endShiftBtn" onclick="endShift()">End shift</button>
-      <button class="btn" onclick="openExportModal(null)" title="Share shift card"><i class="ti ti-share"></i></button>
+      <button class="btn" onclick="openExportModal(null)" title="Share shift card" style="padding:0 10px">↗</button>
       <button class="btn" onclick="resetAll()">New shift</button>
       <button class="btn" onclick="logOut()" title="Log out" style="padding:0 10px;font-size:18px;line-height:1">⏻</button>
     </div>
@@ -757,9 +759,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div id="pastShiftsList"><div class="empty-state">No completed shifts yet</div></div>
       <div id="calendarView" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <button class="btn btn-sm" onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button>
+          <button class="btn btn-sm" onclick="calNav(-1)" style="font-size:16px;padding:0 10px">‹</button>
           <div style="font-weight:700;font-size:14px" id="calMonthLabel"></div>
-          <button class="btn btn-sm" onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button>
+          <button class="btn btn-sm" onclick="calNav(1)" style="font-size:16px;padding:0 10px">›</button>
         </div>
         <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:11px"></div>
         <div id="calDayDetail" style="margin-top:10px"></div>
@@ -800,7 +802,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
     </div>
     <div class="card">
-      <div class="section-title">Weekly commission</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin:0">Commission</div>
+        <div class="period-tabs">
+          <button class="period-tab active" onclick="setCommPeriod('today',this)">Today</button>
+          <button class="period-tab" onclick="setCommPeriod('week',this)">This week</button>
+          <button class="period-tab" onclick="setCommPeriod('month',this)">This month</button>
+          <button class="period-tab" onclick="setCommPeriod('alltime',this)">All time</button>
+        </div>
+      </div>
       <div id="weeklyCommList" class="lb-list">
         <div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>
       </div>
@@ -1999,8 +2009,8 @@ async function renderPastShifts() {
           ${h.hotel?`<div class="shc-hotel">${h.hotel} · ${h.hotelTier||''}</div>`:''}
         </div>
         <div class="shc-actions">
-          <button class="btn btn-sm" onclick="enterPastEditMode(${sid},'${h.date}')"><i class="ti ti-plus"></i></button>
-          <button class="btn btn-sm" onclick='openExportModal(${JSON.stringify({name:currentUser?.name,emoji:currentUser?.emoji,date:h.date,totalSales:h.totalSales,goal:h.goal,txCount:h.txCount,totalGuests:h.totalGuests,hotel:h.hotel,duration:h.duration})})' title="Share card"><i class="ti ti-share"></i></button>
+          <button class="btn btn-sm" onclick="enterPastEditMode(${sid},'${h.date}')" title="Add sale to this shift">+</button>
+          <button class="btn btn-sm" onclick='openExportModal(${JSON.stringify({name:currentUser?.name,emoji:currentUser?.emoji,date:h.date,totalSales:h.totalSales,goal:h.goal,txCount:h.txCount,totalGuests:h.totalGuests,hotel:h.hotel,duration:h.duration})})' title="Share card">↗</button>
           <button class="btn btn-sm" onclick="exportHistoryCSV(${sid},${i})">CSV</button>
           <button class="trash-btn" onclick="deleteHistoryEntry(${sid},${i})"><i class="ti ti-trash"></i></button>
         </div>
@@ -2140,14 +2150,16 @@ async function renderCalendar() {
     const shifts  = byDate[dateStr] || [];
     const isToday = dateStr === today;
     const isSel   = dateStr === _calSelected;
-    const dots = shifts.map(h => {
-      const hit = h.goal > 0 && h.totalSales >= h.goal;
-      const color = h.totalSales === 0 ? '#64748b' : hit ? '#34d399' : '#60a5fa';
-      return `<div class="cal-dot" style="background:${color}"></div>`;
-    }).join('');
-    html += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" onclick="calSelectDay('${dateStr}')">
-      <span class="cal-day-num" style="color:${isToday?'#fff':shifts.length?'var(--text)':'var(--text3)'}">${d}</span>
-      <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:24px">${dots}</div>
+    const dayTotal = shifts.reduce((a, h) => a + (h.totalSales || 0), 0);
+    const anyGoalHit = shifts.some(h => h.goal > 0 && h.totalSales >= h.goal);
+    const allZero = shifts.length > 0 && shifts.every(h => !h.totalSales);
+    const barColor = allZero ? '#64748b' : anyGoalHit ? '#34d399' : '#60a5fa';
+    const amtStr = dayTotal >= 1000 ? '$' + (dayTotal/1000).toFixed(1) + 'k' : dayTotal > 0 ? '$' + Math.round(dayTotal) : shifts.length ? '$0' : '';
+    const hasShift = shifts.length > 0;
+    html += `<div class="cal-day${hasShift?' has-shift':''}${isToday?' today':''}${isSel?' selected':''}"${hasShift?` onclick="calSelectDay('${dateStr}')"`:''}>
+      <span class="cal-day-num" style="color:${isToday?'#fff':hasShift?'var(--text)':'var(--text3)'}">${d}</span>
+      ${hasShift ? `<span class="cal-day-amt" style="color:${isToday?'#fff':barColor}">${amtStr}</span><div class="cal-day-bar" style="background:${barColor}"></div>` : ''}
+      ${shifts.length > 1 ? `<span style="font-size:9px;color:${isToday?'rgba(255,255,255,.7)':'var(--text3)'}">${shifts.length} shifts</span>` : ''}
     </div>`;
   }
   // Pad end to fill 6 rows
@@ -2245,12 +2257,21 @@ function setLbPeriod(period, btn) {
   renderLeaderboard();
 }
 
+let _commPeriod = 'week';
+function setCommPeriod(period, btn) {
+  _commPeriod = period;
+  btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderWeeklyComm();
+}
+
 async function renderWeeklyComm() {
   const el = document.getElementById('weeklyCommList');
   try {
-    const board = await apiGet('/api/leaderboard?period=week&tz=' + new Date().getTimezoneOffset());
+    const board = await apiGet('/api/leaderboard?period=' + _commPeriod + '&tz=' + new Date().getTimezoneOffset());
     const sorted = [...(board || [])].sort((a,b) => b.totalCommission - a.totalCommission).filter(r => r.totalCommission > 0);
-    if (!sorted.length) { el.innerHTML = '<div class="empty-state">No commission earned this week yet</div>'; return; }
+    const periodLabel = { today:'today', week:'this week', month:'this month', alltime:'yet' }[_commPeriod] || '';
+    if (!sorted.length) { el.innerHTML = `<div class="empty-state">No commission earned ${periodLabel}</div>`; return; }
     el.innerHTML = sorted.map((row, i) => {
       const isMe = row.user.id === currentUser?.id;
       return `<div class="lb-row${isMe?' me':''}">
