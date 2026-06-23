@@ -2634,7 +2634,6 @@ function psmAddSale() {
   document.getElementById('psmPriceSection').style.display='none';
 }
 async function savePastShift() {
-  if (!psmSales.length) { alert('Add at least one sale before saving.'); return; }
   const dateVal = document.getElementById('psmDate').value;
   const startVal = document.getElementById('psmStartTime').value;
   const endVal = document.getElementById('psmEndTime').value;
