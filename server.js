@@ -36,27 +36,68 @@ function udir(id) {
 }
 function safeUser(u) { const { pinHash, ...s } = u; return s; }
 
-// In-memory sessions (token → userId). Users re-login after server restart.
-const sessions = new Map();
+// ── Sessions (in-memory; users re-login after server restart) ─
+const sessions = new Map(); // token → { userId, createdAt }
+const SESSION_TTL = 12 * 60 * 60 * 1000; // 12 hours
+
+// ── Rate limiting for login ────────────────────────────────────
+const loginAttempts = new Map(); // ip → { count, lockUntil }
+const MAX_ATTEMPTS  = 5;
+const LOCK_DURATION = 15 * 60 * 1000; // 15 min
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, a] of loginAttempts) if (now > a.lockUntil && a.count === 0) loginAttempts.delete(ip);
+}, 60 * 60 * 1000);
 
 app.use(express.json({ limit: '10mb' }));
+
+// ── Security headers ───────────────────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://unpkg.com",
+    "font-src https://unpkg.com",
+    "img-src 'self' data:",
+    "connect-src 'self'",
+  ].join('; '));
+  if (req.headers['x-forwarded-proto'] === 'https')
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
+function getToken(req) { return (req.headers.authorization || '').replace('Bearer ', '').trim(); }
+
 function auth(req, res, next) {
-  const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
-  const uid   = sessions.get(token);
-  if (!uid) return res.status(401).json({ error: 'Not authenticated' });
-  req.uid = uid;
+  const token = getToken(req);
+  const sess  = sessions.get(token);
+  if (!sess) return res.status(401).json({ error: 'Not authenticated' });
+  if (Date.now() - sess.createdAt > SESSION_TTL) {
+    sessions.delete(token);
+    return res.status(401).json({ error: 'Session expired — please log in again' });
+  }
+  req.uid = sess.userId;
   next();
 }
 
 function adminAuth(req, res, next) {
-  const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
-  const uid   = sessions.get(token);
-  if (!uid) return res.status(401).json({ error: 'Not authenticated' });
-  const user  = read(path.join(DATA, 'users.json'), []).find(u => u.id === uid);
+  const token = getToken(req);
+  const sess  = sessions.get(token);
+  if (!sess) return res.status(401).json({ error: 'Not authenticated' });
+  if (Date.now() - sess.createdAt > SESSION_TTL) {
+    sessions.delete(token);
+    return res.status(401).json({ error: 'Session expired — please log in again' });
+  }
+  const user = read(path.join(DATA, 'users.json'), []).find(u => u.id === sess.userId);
   if (!user?.isAdmin) return res.status(403).json({ error: 'Admin only' });
-  req.uid = uid;
+  req.uid = sess.userId;
   next();
 }
 
@@ -79,24 +120,34 @@ app.post('/api/users', (req, res) => {
   all.push(user);
   write(path.join(DATA, 'users.json'), all);
   const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, user.id);
+  sessions.set(token, { userId: user.id, createdAt: Date.now() });
   res.json({ token, user: safeUser(user) });
 });
 
 // ── Auth ──────────────────────────────────────────────────
 app.post('/api/login', (req, res) => {
+  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  const attempt = loginAttempts.get(ip) || { count: 0, lockUntil: 0 };
+  if (Date.now() < attempt.lockUntil)
+    return res.status(429).json({ error: 'Too many failed attempts. Try again in 15 minutes.' });
+
   const { userId, pin } = req.body;
   const all  = read(path.join(DATA, 'users.json'), []);
   const user = all.find(u => u.id === userId);
-  if (!user)                                 return res.status(404).json({ error: 'User not found' });
-  if (user.pinHash !== hashPin(String(pin))) return res.status(401).json({ error: 'Wrong PIN' });
+  if (!user || user.pinHash !== hashPin(String(pin))) {
+    attempt.count++;
+    if (attempt.count >= MAX_ATTEMPTS) { attempt.lockUntil = Date.now() + LOCK_DURATION; attempt.count = 0; }
+    loginAttempts.set(ip, attempt);
+    return res.status(401).json({ error: 'Wrong PIN', attemptsLeft: Math.max(0, MAX_ATTEMPTS - attempt.count) });
+  }
+  loginAttempts.delete(ip);
   const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, user.id);
+  sessions.set(token, { userId: user.id, createdAt: Date.now() });
   res.json({ token, user: safeUser(user) });
 });
 
 app.post('/api/logout', auth, (req, res) => {
-  sessions.delete((req.headers.authorization || '').replace('Bearer ', '').trim());
+  sessions.delete(getToken(req));
   res.json({ ok: true });
 });
 
@@ -110,8 +161,11 @@ app.get('/api/me', auth, (req, res) => {
 // ── Admin: claim admin role ────────────────────────────────
 app.post('/api/admin/promote', auth, (req, res) => {
   const secret = (process.env.ADMIN_SECRET || '').trim();
-  if (!secret)                    return res.status(503).json({ error: 'ADMIN_SECRET not configured on server' });
-  if (req.body.secret !== secret) return res.status(403).json({ error: 'Wrong secret' });
+  if (!secret) return res.status(503).json({ error: 'ADMIN_SECRET not configured on server' });
+  const provided = Buffer.from(String(req.body.secret || ''));
+  const expected = Buffer.from(secret);
+  const match = provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+  if (!match) return res.status(403).json({ error: 'Wrong secret' });
   const all = read(path.join(DATA, 'users.json'), []);
   const idx = all.findIndex(u => u.id === req.uid);
   if (idx === -1) return res.status(404).json({ error: 'User not found' });

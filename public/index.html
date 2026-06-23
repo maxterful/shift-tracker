@@ -314,6 +314,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .past-stat { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; }
 .past-stat-val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
 .past-stat-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; font-weight: 500; }
+/* Calendar */
+.cal-header-cell { text-align:center; color:var(--text3); font-weight:700; padding:4px 0; }
+.cal-day { aspect-ratio:1; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; position:relative; gap:2px; }
+.cal-day:hover { background:var(--bg2); }
+.cal-day.today { background:var(--blue-dark); }
+.cal-day.selected { outline:2px solid var(--blue-mid); }
+.cal-day.other-month { opacity:0.3; }
+.cal-day-num { font-size:12px; font-weight:600; line-height:1; }
+.cal-dot { width:6px; height:6px; border-radius:50%; }
 /* Milestone toast */
 .milestone-toast { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.8); background:var(--green-dark); color:#fff; border-radius:20px; padding:20px 28px; text-align:center; z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s,transform 0.25s; box-shadow:0 8px 40px rgba(0,0,0,0.4); min-width:220px; }
 .milestone-toast.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
@@ -737,14 +746,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   <!-- PAST SHIFTS -->
   <div class="tab-panel" id="tab-past">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div class="section-title" style="margin:0">Completed shifts</div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-sm" id="calToggleBtn" onclick="toggleCalendarView()"><i class="ti ti-calendar" style="margin-right:4px"></i>Calendar</button>
           <button class="btn btn-sm btn-primary" onclick="openPastShiftModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Log past shift</button>
           <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear all</button>
         </div>
       </div>
       <div id="pastShiftsList"><div class="empty-state">No completed shifts yet</div></div>
+      <div id="calendarView" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <button class="btn btn-sm" onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button>
+          <div style="font-weight:700;font-size:14px" id="calMonthLabel"></div>
+          <button class="btn btn-sm" onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button>
+        </div>
+        <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:11px"></div>
+        <div id="calDayDetail" style="margin-top:10px"></div>
+      </div>
     </div>
     <div class="card" id="pastStatsCard" style="display:none">
       <div class="section-title">Your all-time stats</div>
@@ -1686,6 +1705,7 @@ async function logOut() {
   if (prodChart) { prodChart.destroy(); prodChart = null; }
   if (timeChart) { timeChart.destroy(); timeChart = null; }
   if (trendChartInst) { trendChartInst.destroy(); trendChartInst = null; }
+  _calView = false; _calSelected = null;
   showLoginScreen();
 }
 async function switchUser() {
@@ -2068,6 +2088,109 @@ async function renderPastShifts() {
       }
     });
   }
+}
+
+// ─── Calendar view ───────────────────────────────────────────
+let _calView = false;
+let _calYear = new Date().getFullYear();
+let _calMonth = new Date().getMonth();
+let _calSelected = null;
+
+function toggleCalendarView() {
+  _calView = !_calView;
+  const btn = document.getElementById('calToggleBtn');
+  document.getElementById('pastShiftsList').style.display = _calView ? 'none' : '';
+  document.getElementById('calendarView').style.display   = _calView ? '' : 'none';
+  btn.style.background    = _calView ? 'var(--blue-mid)' : '';
+  btn.style.color         = _calView ? '#fff' : '';
+  btn.style.borderColor   = _calView ? 'var(--blue-mid)' : '';
+  if (_calView) renderCalendar();
+}
+
+async function renderCalendar() {
+  const history = await getHistory();
+  // Build a map of dateStr → [{totalSales, goal, hotel}]
+  const byDate = {};
+  history.forEach(h => {
+    if (!h.shiftStart) return;
+    const d = new Date(h.shiftStart).toLocaleDateString('en-CA');
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(h);
+  });
+
+  const label = document.getElementById('calMonthLabel');
+  const grid  = document.getElementById('calGrid');
+  label.textContent = new Date(_calYear, _calMonth, 1).toLocaleDateString([], { month: 'long', year: 'numeric' });
+
+  const today = new Date().toLocaleDateString('en-CA');
+  const firstDay = new Date(_calYear, _calMonth, 1).getDay();
+  const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(_calYear, _calMonth, 0).getDate();
+
+  const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  let html = days.map(d => `<div class="cal-header-cell">${d}</div>`).join('');
+
+  // Pad start
+  for (let i = 0; i < firstDay; i++) {
+    const day = daysInPrev - firstDay + 1 + i;
+    html += `<div class="cal-day other-month"><span class="cal-day-num">${day}</span></div>`;
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const shifts  = byDate[dateStr] || [];
+    const isToday = dateStr === today;
+    const isSel   = dateStr === _calSelected;
+    const dots = shifts.map(h => {
+      const hit = h.goal > 0 && h.totalSales >= h.goal;
+      const color = h.totalSales === 0 ? '#64748b' : hit ? '#34d399' : '#60a5fa';
+      return `<div class="cal-dot" style="background:${color}"></div>`;
+    }).join('');
+    html += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" onclick="calSelectDay('${dateStr}')">
+      <span class="cal-day-num" style="color:${isToday?'#fff':shifts.length?'var(--text)':'var(--text3)'}">${d}</span>
+      <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:24px">${dots}</div>
+    </div>`;
+  }
+  // Pad end to fill 6 rows
+  const total = firstDay + daysInMonth;
+  const endPad = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let i = 1; i <= endPad; i++)
+    html += `<div class="cal-day other-month"><span class="cal-day-num">${i}</span></div>`;
+
+  grid.innerHTML = html;
+  if (_calSelected) calSelectDay(_calSelected, true);
+}
+
+async function calSelectDay(dateStr, noToggle) {
+  if (!noToggle && _calSelected === dateStr) { _calSelected = null; document.getElementById('calDayDetail').innerHTML = ''; renderCalendar(); return; }
+  _calSelected = dateStr;
+  const history = await getHistory();
+  const shifts = history.filter(h => h.shiftStart && new Date(h.shiftStart).toLocaleDateString('en-CA') === dateStr);
+  const detail = document.getElementById('calDayDetail');
+  if (!shifts.length) { detail.innerHTML = ''; renderCalendar(); return; }
+  detail.innerHTML = `<div style="border-top:0.5px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px">` +
+    shifts.map(h => {
+      const gp = h.goal > 0 ? Math.round(h.totalSales / h.goal * 100) : null;
+      return `<div style="background:var(--bg2);border-radius:var(--radius);padding:10px 12px;font-size:13px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-weight:700">${fmt(h.totalSales)}</span>
+            ${gp!==null?`<span style="font-size:11px;color:${gp>=100?'var(--green-mid)':'var(--text3)'};margin-left:6px">${gp}% of goal</span>`:''}
+          </div>
+          <span style="font-size:11px;color:var(--text3)">${h.startTime||''}${h.endTime?' – '+h.endTime:''}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">${[h.hotel,h.shiftType?h.shiftType+' Shift':null,h.txCount+' sale'+(h.txCount!==1?'s':'')].filter(Boolean).join(' · ')}</div>
+      </div>`;
+    }).join('') + '</div>';
+  renderCalendar();
+}
+
+function calNav(dir) {
+  _calMonth += dir;
+  if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+  if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
+  _calSelected = null;
+  document.getElementById('calDayDetail').innerHTML = '';
+  renderCalendar();
 }
 
 // ─── Leaderboard ─────────────────────────────────────────────
