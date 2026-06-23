@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Shift Tracker</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1e293b" id="themeColorMeta">
+<script>
+(function(){var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.classList.add('theme-'+t);})();
+</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shift Tracker">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -35,6 +43,40 @@
   }
 }
 
+/* Manual theme override — applied to <html> so they beat the media query */
+html.theme-dark {
+  --bg: #18181a; --bg2: #222220; --bg3: #2c2c2a;
+  --text: #f0ede8; --text2: #9a9890; --text3: #636260;
+  --border: rgba(255,255,255,0.09); --border2: rgba(255,255,255,0.20);
+  --blue: #93C5FD; --blue-mid: #60A5FA; --blue-bg: #0D2648; --blue-border: #1E3A5F;
+  --green: #86EFAC; --green-mid: #4ADE80; --green-bg: #052E16; --green-border: #14532D;
+  --amber: #FCD34D; --amber-mid: #FBBF24; --amber-bg: #291700; --amber-border: #451A03;
+  --red: #FCA5A5; --red-mid: #F87171; --red-bg: #2B0A0A; --red-border: #501313;
+  --purple: #D8B4FE; --purple-mid: #C084FC; --purple-bg: #1B0A33; --purple-border: #2E1065;
+  --teal: #5EEAD4; --teal-mid: #2DD4BF; --teal-bg: #041F1E; --teal-border: #042F2E;
+}
+html.theme-light {
+  --bg: #ffffff; --bg2: #f6f5f2; --bg3: #edebe6;
+  --text: #18181a; --text2: #62625e; --text3: #9a9994;
+  --border: rgba(0,0,0,0.09); --border2: rgba(0,0,0,0.20);
+  --blue: #1558B0; --blue-mid: #2563EB; --blue-bg: #EFF6FF; --blue-border: #BFDBFE;
+  --green: #155228; --green-mid: #16A34A; --green-bg: #F0FDF4; --green-border: #BBF7D0;
+  --amber: #8B4507; --amber-mid: #D97706; --amber-bg: #FFFBEB; --amber-border: #FDE68A;
+  --red: #8B1A1A; --red-mid: #DC2626; --red-bg: #FEF2F2; --red-border: #FECACA;
+  --purple: #4C1D95; --purple-mid: #7C3AED; --purple-bg: #FAF5FF; --purple-border: #DDD6FE;
+  --teal: #0F4440; --teal-mid: #0D9488; --teal-bg: #F0FDFA; --teal-border: #99F6E4;
+}
+/* Day-of-week bars */
+.dow-row { display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:6px; }
+.dow-label { width:28px; color:var(--text3); font-weight:600; flex-shrink:0; }
+.dow-bar-wrap { flex:1; background:var(--bg3); border-radius:4px; height:14px; overflow:hidden; }
+.dow-bar-fill { height:100%; border-radius:4px; background:var(--blue-mid); transition:width .4s; }
+.dow-val { width:48px; text-align:right; color:var(--text2); font-weight:600; flex-shrink:0; }
+/* Template chips */
+.tpl-chip { display:flex; align-items:center; gap:6px; background:var(--bg2); border:1px solid var(--border2); border-radius:99px; padding:5px 10px 5px 12px; font-size:12px; cursor:pointer; transition:border-color .15s; }
+.tpl-chip:hover { border-color:var(--blue-mid); }
+.tpl-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; line-height:1; padding:0 2px; }
+.tpl-del:hover { color:var(--red-mid); }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; }
 
 /* ── Login Screen ─────────────────────────────────────────── */
@@ -548,6 +590,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="btn btn-danger" id="endShiftBtn" onclick="endShift()">End shift</button>
       <button class="btn" onclick="openExportModal(null)" title="Share shift card" style="padding:0 10px">↗</button>
       <button class="btn" onclick="resetAll()">New shift</button>
+      <button class="btn" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark" style="padding:0 10px;font-size:18px;line-height:1">🌙</button>
       <button class="btn" onclick="logOut()" title="Log out" style="padding:0 10px;font-size:18px;line-height:1">⏻</button>
     </div>
   </div>
@@ -782,6 +825,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div id="personalRecords" style="font-size:13px;color:var(--text2)">—</div>
       <div class="section-title" style="margin-top:14px;margin-bottom:10px">Recent shifts</div>
       <div style="position:relative;height:120px"><canvas id="trendChart"></canvas></div>
+      <div class="section-title" style="margin-top:14px;margin-bottom:10px">Sales by day of week <span style="font-size:11px;font-weight:400;color:var(--text3)">(avg per shift)</span></div>
+      <div id="dowChart"></div>
     </div>
   </div>
 
@@ -810,6 +855,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <button class="period-tab" onclick="setCommPeriod('month',this)">This month</button>
           <button class="period-tab" onclick="setCommPeriod('alltime',this)">All time</button>
         </div>
+      </div>
+      <div id="monthlyProjBanner" style="display:none;background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:13px">
+        <div style="font-weight:700;color:var(--green-mid)" id="monthlyProjTitle">Monthly projection</div>
+        <div style="color:var(--text2);margin-top:2px" id="monthlyProjSub"></div>
       </div>
       <div id="weeklyCommList" class="lb-list">
         <div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>
@@ -913,6 +962,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="section-title">Shift notes</div>
       <div class="input-group" style="margin-bottom:0">
         <textarea id="shiftNotes" placeholder="Weather, special events, team goals, anything relevant…" oninput="state.notes=this.value;scheduleSave()"></textarea>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-title" style="margin:0">Shift templates</div>
+        <button class="btn btn-sm btn-primary" onclick="saveTemplate()">+ Save current</button>
+      </div>
+      <div id="templateList" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px">
+        <span style="font-size:12px;color:var(--text3)" id="templateEmpty">No templates saved yet.</span>
       </div>
     </div>
     <div class="card">
@@ -1223,7 +1281,12 @@ function setSyncUI(status, label) {
   const dot = document.getElementById('syncDot');
   const lbl = document.getElementById('syncLabel');
   dot.className = 'sync-dot ' + status;
-  lbl.textContent = label;
+  if (status === 'offline') {
+    const n = lsGet(lsPendingKey(), []).length;
+    lbl.textContent = n > 0 ? label + ' · ' + n + ' queued' : label;
+  } else {
+    lbl.textContent = label;
+  }
 }
 
 // ─── Per-user localStorage keys ──────────────────────────────
@@ -1566,6 +1629,7 @@ async function enterApp(freshLogin = false) {
   if (!local) render();
   buildHotelSelect();
   renderCategoryPills();
+  renderTemplates();
   updateTimer();
 
   // Show shift setup on fresh PIN login
@@ -2177,6 +2241,30 @@ async function renderPastShifts() {
       }
     });
   }
+
+  // Day-of-week breakdown
+  const DOW_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dowTotals = [0,0,0,0,0,0,0];
+  const dowCounts = [0,0,0,0,0,0,0];
+  history.forEach(h => {
+    if (!h.shiftStart) return;
+    const d = new Date(h.shiftStart).getDay();
+    dowTotals[d] += h.totalSales || 0;
+    dowCounts[d]++;
+  });
+  const maxDow = Math.max(...dowTotals, 1);
+  const dowEl = document.getElementById('dowChart');
+  if (dowEl) {
+    dowEl.innerHTML = DOW_LABELS.map((d, i) => {
+      const pct = Math.round((dowTotals[i] / maxDow) * 100);
+      const avg = dowCounts[i] ? dowTotals[i] / dowCounts[i] : 0;
+      return `<div class="dow-row">
+        <span class="dow-label">${d}</span>
+        <div class="dow-bar-wrap"><div class="dow-bar-fill" style="width:${pct}%"></div></div>
+        <span class="dow-val">${avg > 0 ? fmt(avg) : '—'}</span>
+      </div>`;
+    }).join('');
+  }
 }
 
 // ─── Calendar view ───────────────────────────────────────────
@@ -2346,9 +2434,32 @@ function setCommPeriod(period, btn) {
 
 async function renderWeeklyComm() {
   const el = document.getElementById('weeklyCommList');
+  // Monthly projection banner (only shown when period is 'month')
+  const projBanner = document.getElementById('monthlyProjBanner');
+  const projTitle  = document.getElementById('monthlyProjTitle');
+  const projSub    = document.getElementById('monthlyProjSub');
   try {
     const board = await apiGet('/api/leaderboard?period=' + _commPeriod + '&tz=' + new Date().getTimezoneOffset());
     const sorted = [...(board || [])].sort((a,b) => b.totalCommission - a.totalCommission).filter(r => r.totalCommission > 0);
+
+    // Show/hide monthly projection for current user
+    if (_commPeriod === 'month' && projBanner && currentUser) {
+      const me = (board || []).find(r => r.user.id === currentUser.id);
+      if (me && me.totalCommission > 0) {
+        const now = new Date();
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+        const elapsed = now.getDate();
+        const projected = Math.round((me.totalCommission / elapsed) * daysInMonth);
+        const pct = Math.round((elapsed / daysInMonth) * 100);
+        projTitle.textContent = `Your projected commission: ${fmtD(projected)}`;
+        projSub.textContent   = `${fmtD(me.totalCommission)} earned so far · ${elapsed}/${daysInMonth} days (${pct}% of month)`;
+        projBanner.style.display = '';
+      } else {
+        projBanner.style.display = 'none';
+      }
+    } else if (projBanner) {
+      projBanner.style.display = 'none';
+    }
     const periodLabel = { today:'today', week:'this week', month:'this month', alltime:'yet' }[_commPeriod] || '';
     if (!sorted.length) { el.innerHTML = `<div class="empty-state">No commission earned ${periodLabel}</div>`; return; }
     el.innerHTML = sorted.map((row, i) => {
@@ -2929,6 +3040,7 @@ function switchTab(id, el) {
   el.classList.add('active');
   if (id==='past')        renderPastShifts();
   if (id==='leaderboard') { renderLeaderboard(); renderWeeklyComm(); renderHotelLeaderboard(); _insightsData=null; renderInsights(); }
+  if (id==='setup')       renderTemplates();
 }
 
 // ─── Sale actions ─────────────────────────────────────────────
@@ -3286,6 +3398,85 @@ function updateTimer() {
 }
 setInterval(updateTimer,1000);
 
+// ─── Theme ────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('theme');
+  const prefer = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const theme = saved || prefer;
+  document.documentElement.classList.remove('theme-dark', 'theme-light');
+  document.documentElement.classList.add('theme-' + theme);
+  const meta = document.getElementById('themeColorMeta');
+  if (meta) meta.content = theme === 'dark' ? '#1e293b' : '#ffffff';
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const isDark = document.documentElement.classList.contains('theme-dark');
+  const next = isDark ? 'light' : 'dark';
+  document.documentElement.classList.remove('theme-dark', 'theme-light');
+  document.documentElement.classList.add('theme-' + next);
+  localStorage.setItem('theme', next);
+  const meta = document.getElementById('themeColorMeta');
+  if (meta) meta.content = next === 'dark' ? '#1e293b' : '#ffffff';
+  document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+initTheme();
+
+// ─── Shift templates ──────────────────────────────────────────
+const lsTemplatesKey = () => 'shiftTemplates_' + (currentUser?.id || 'anon');
+
+function renderTemplates() {
+  const tmpl = lsGet(lsTemplatesKey(), []);
+  const wrap  = document.getElementById('templateList');
+  const empty = document.getElementById('templateEmpty');
+  if (!wrap) return;
+  if (!tmpl.length) { wrap.innerHTML = '<span style="font-size:12px;color:var(--text3)" id="templateEmpty">No templates saved yet.</span>'; return; }
+  wrap.innerHTML = tmpl.map((t, i) => `
+    <div class="tpl-chip" onclick="applyTemplate(${i})">
+      <span>${t.name}</span>
+      <button class="tpl-del" onclick="event.stopPropagation();deleteTemplate(${i})" title="Delete">×</button>
+    </div>`).join('');
+}
+
+function saveTemplate() {
+  const name = prompt('Template name (e.g. "Mon Premier"):', state.hotel || 'My template');
+  if (!name) return;
+  const tmpl = lsGet(lsTemplatesKey(), []);
+  tmpl.push({
+    name: name.trim().slice(0, 30),
+    hotel: state.hotel,
+    hotelTier: state.hotelTier,
+    shiftType: state.shiftType,
+    goal: state.goal,
+    commGoal: state.commGoal,
+    taxRate: state.taxRate,
+    priceIncludesTax: state.priceIncludesTax,
+  });
+  lsSet(lsTemplatesKey(), tmpl);
+  renderTemplates();
+}
+
+function applyTemplate(i) {
+  const tmpl = lsGet(lsTemplatesKey(), []);
+  const t = tmpl[i]; if (!t) return;
+  if (t.hotel)          { state.hotel = t.hotel; const hs = document.getElementById('hotelSelect'); if (hs) hs.value = t.hotel; }
+  if (t.hotelTier)      { state.hotelTier = t.hotelTier; const ht = document.getElementById('hotelTierSelect'); if (ht) ht.value = t.hotelTier; }
+  if (t.shiftType)      { state.shiftType = t.shiftType; document.getElementById('shiftTypeA')?.classList.toggle('active', t.shiftType==='A'); document.getElementById('shiftTypeB')?.classList.toggle('active', t.shiftType==='B'); }
+  if (t.goal != null)   { state.goal = t.goal; const gi = document.getElementById('goalInput'); if (gi) gi.value = t.goal || ''; }
+  if (t.commGoal != null){ state.commGoal = t.commGoal; const ci = document.getElementById('commGoalInput'); if (ci) ci.value = t.commGoal || ''; }
+  if (t.taxRate != null) { state.taxRate = t.taxRate; const ti = document.getElementById('taxRateInput'); if (ti) ti.value = t.taxRate; }
+  if (t.priceIncludesTax != null) { state.priceIncludesTax = t.priceIncludesTax; const pc = document.getElementById('priceIncludesTaxCheck'); if (pc) pc.checked = t.priceIncludesTax; }
+  state.updatedAt = Date.now();
+  render(); scheduleSave();
+}
+
+function deleteTemplate(i) {
+  const tmpl = lsGet(lsTemplatesKey(), []);
+  tmpl.splice(i, 1);
+  lsSet(lsTemplatesKey(), tmpl);
+  renderTemplates();
+}
+
 // ─── Boot ─────────────────────────────────────────────────────
 (async function boot() {
   const session = getSession();
@@ -3299,6 +3490,11 @@ setInterval(updateTimer,1000);
     showLoginScreen();
   }
 })();
+
+// ─── PWA Service Worker ────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
 </script>
 
 <!-- Shift export card modal -->
