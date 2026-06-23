@@ -1209,7 +1209,7 @@ async function apiFetch(method, path, body) {
   const opts = { method, headers: authHeaders(), signal: AbortSignal.timeout(5000) };
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
-  if (res.status === 401) { serverOk = false; setSyncUI('offline', 'Session expired'); return null; }
+  if (res.status === 401) { serverOk = false; setSyncUI('offline', 'Session expired'); handleSessionExpiry(); return null; }
   if (!res.ok) throw new Error(res.status);
   return res.json();
 }
@@ -1705,6 +1705,83 @@ function savePrices() {
   setTimeout(() => { msg.textContent = ''; }, 5000);
 }
 
+// ── Session expiry re-auth ───────────────────────────────────
+let _reAuthShown = false;
+let _reAuthPin = '';
+
+function handleSessionExpiry() {
+  if (_reAuthShown || !currentUser) return;
+  _reAuthShown = true;
+  lsSet(lsStateKey(), state); // save state immediately
+  document.getElementById('reAuthEmoji').textContent = currentUser.emoji || '😎';
+  document.getElementById('reAuthName').textContent  = currentUser.name;
+  _reAuthPin = '';
+  buildReAuthPad();
+  updateReAuthDots();
+  document.getElementById('reAuthError').textContent = '';
+  document.getElementById('reAuthOverlay').style.display = 'flex';
+}
+
+function buildReAuthPad() {
+  const pad = document.getElementById('reAuthPad');
+  const digits = [1,2,3,4,5,6,7,8,9,'',0,'⌫'];
+  pad.innerHTML = digits.map(d => {
+    if (d === '') return '<div></div>';
+    const isBack = d === '⌫';
+    return `<button class="numpad-btn" onclick="reAuthDigit('${d}')" style="font-size:${isBack?'20px':'22px'}">${d}</button>`;
+  }).join('');
+}
+
+function reAuthDigit(d) {
+  const err = document.getElementById('reAuthError');
+  if (d === '⌫') { _reAuthPin = _reAuthPin.slice(0, -1); err.textContent = ''; }
+  else if (_reAuthPin.length < 4) { _reAuthPin += d; }
+  updateReAuthDots();
+  if (_reAuthPin.length === 4) setTimeout(submitReAuth, 80);
+}
+
+function updateReAuthDots() {
+  for (let i = 0; i < 4; i++)
+    document.getElementById('rad'+i).classList.toggle('filled', i < _reAuthPin.length);
+}
+
+async function submitReAuth() {
+  const err = document.getElementById('reAuthError');
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUser.id, pin: _reAuthPin })
+    });
+    const data = await res.json();
+    if (data.token) {
+      authToken = data.token;
+      setSession(authToken, currentUser);
+      serverOk = true;
+      setSyncUI('live', 'Synced');
+      _reAuthShown = false;
+      _reAuthPin = '';
+      document.getElementById('reAuthOverlay').style.display = 'none';
+      // Flush pending history entries now that we have a valid session
+      getHistory();
+    } else {
+      err.textContent = data.error || 'Wrong PIN';
+      _reAuthPin = '';
+      updateReAuthDots();
+    }
+  } catch {
+    err.textContent = 'Could not reach server — check connection';
+    _reAuthPin = '';
+    updateReAuthDots();
+  }
+}
+
+function reAuthSwitchUser() {
+  document.getElementById('reAuthOverlay').style.display = 'none';
+  _reAuthShown = false;
+  switchUser();
+}
+
 async function logOut() {
   if (!confirm('Log out?')) return;
   try { await apiPost('/api/logout'); } catch {}
@@ -1716,6 +1793,8 @@ async function logOut() {
   if (timeChart) { timeChart.destroy(); timeChart = null; }
   if (trendChartInst) { trendChartInst.destroy(); trendChartInst = null; }
   _calView = false; _calSelected = null;
+  _reAuthShown = false;
+  document.getElementById('reAuthOverlay').style.display = 'none';
   showLoginScreen();
 }
 async function switchUser() {
@@ -3352,6 +3431,24 @@ setInterval(updateTimer,1000);
 </div>
 
 <!-- Milestone celebration toast -->
+<!-- Re-auth overlay (shown on session expiry without losing page state) -->
+<div id="reAuthOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:800;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:20px;padding:28px 24px;max-width:340px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);text-align:center">
+    <div style="font-size:36px;margin-bottom:8px" id="reAuthEmoji">😎</div>
+    <div style="font-size:18px;font-weight:800;margin-bottom:4px" id="reAuthName"></div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:20px">Your session expired — enter your PIN to continue.<br>Your shift data is safe.</div>
+    <div style="display:flex;justify-content:center;gap:10px;margin-bottom:16px" id="reAuthDots">
+      <div class="pin-dot" id="rad0"></div>
+      <div class="pin-dot" id="rad1"></div>
+      <div class="pin-dot" id="rad2"></div>
+      <div class="pin-dot" id="rad3"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px" id="reAuthPad"></div>
+    <div id="reAuthError" style="font-size:12px;color:var(--red-mid);min-height:18px;margin-bottom:8px"></div>
+    <button class="btn" style="width:100%;font-size:13px;color:var(--text3)" onclick="reAuthSwitchUser()">Switch user instead</button>
+  </div>
+</div>
+
 <div class="milestone-toast" id="milestoneToast">
   <span class="milestone-toast-icon" id="milestoneIcon"></span>
   <div class="milestone-toast-msg" id="milestoneMsg"></div>
