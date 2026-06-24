@@ -1267,12 +1267,20 @@ function authHeaders() {
 let serverOk = false;
 
 async function apiFetch(method, path, body) {
-  const opts = { method, headers: authHeaders(), signal: AbortSignal.timeout(5000) };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 6000);
+  const opts = { method, headers: authHeaders(), signal: ctrl.signal };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const res = await fetch(path, opts);
-  if (res.status === 401) { serverOk = false; setSyncUI('offline', 'Session expired'); handleSessionExpiry(); return null; }
-  if (!res.ok) throw new Error(res.status);
-  return res.json();
+  try {
+    const res = await fetch(path, opts);
+    clearTimeout(timer);
+    if (res.status === 401) { serverOk = false; setSyncUI('offline', 'Session expired'); handleSessionExpiry(); return null; }
+    if (!res.ok) throw new Error(res.status);
+    return res.json();
+  } catch(e) {
+    clearTimeout(timer);
+    throw e;
+  }
 }
 const apiGet    = p       => apiFetch('GET',    p);
 const apiPut    = (p, b)  => apiFetch('PUT',    p, b);
@@ -2696,6 +2704,7 @@ async function confirmEndShift() {
 let _editSaleShiftId = null;
 let _editSaleSaleIdx = null;
 let _editSaleHistory = null;
+let _editSaleIsUpgrade = false;
 function toggleShiftSales(sid) {
   const el = document.getElementById('shcSales_'+sid);
   if (!el) return;
@@ -2709,10 +2718,30 @@ function openEditSaleModal(shiftId, saleIdx) {
   const sale = (shift.sales || [])[saleIdx];
   if (!sale) return;
   _editSaleShiftId = shiftId; _editSaleSaleIdx = saleIdx; _editSaleHistory = shift;
+  _editSaleIsUpgrade = !!sale.isUpgrade;
   document.getElementById('editSaleTitle').textContent = sale.product;
   document.getElementById('editSaleAmount').value = sale.unitAmount || sale.amount;
   document.getElementById('editSaleGuests').value = sale.guests || 1;
+  _applyEditUpgradeUI();
   document.getElementById('editSaleModal').style.display = 'flex';
+}
+function _applyEditUpgradeUI() {
+  const btn  = document.getElementById('editSaleUpgradeBtn');
+  const hint = document.getElementById('editSaleUpgradeHint');
+  if (!btn) return;
+  if (_editSaleIsUpgrade) {
+    btn.style.cssText = 'width:100%;padding:9px;border-radius:var(--radius);border:1px solid #7C3AED;background:#7C3AED;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+    btn.textContent = '↑ Upgrade (ON) — enter delta paid';
+    if (hint) hint.style.display = '';
+  } else {
+    btn.style.cssText = 'width:100%;padding:9px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit';
+    btn.textContent = '↑ Mark as upgrade';
+    if (hint) hint.style.display = 'none';
+  }
+}
+function toggleEditSaleUpgrade() {
+  _editSaleIsUpgrade = !_editSaleIsUpgrade;
+  _applyEditUpgradeUI();
 }
 function closeEditSaleModal() {
   document.getElementById('editSaleModal').style.display = 'none';
@@ -2731,7 +2760,7 @@ async function saveEditedSale() {
   const inclTax = state.priceIncludesTax !== false;
   const preTax = inclTax ? newAmt/(1+taxRate/100) : newAmt;
   const commission = calcCommission(oldSale.product, preTax, shift.hotelTier || 'Premier');
-  sales[_editSaleSaleIdx] = { ...oldSale, amount: newAmt, unitAmount: newAmt, preTax: Math.round(preTax*100)/100, commission, guests: newGuests };
+  sales[_editSaleSaleIdx] = { ...oldSale, amount: newAmt, unitAmount: newAmt, preTax: Math.round(preTax*100)/100, commission, guests: newGuests, isUpgrade: _editSaleIsUpgrade || undefined };
   closeEditSaleModal();
   try {
     const result = await apiFetch('PUT', '/api/me/history/'+_editSaleShiftId, { ...shift, sales });
@@ -3740,6 +3769,12 @@ if (isIOS && !isStandalone) {
     <div class="input-group" style="margin-top:10px">
       <label>Guests</label>
       <input type="number" id="editSaleGuests" min="1" inputmode="numeric" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+    </div>
+    <div style="margin-top:12px">
+      <button id="editSaleUpgradeBtn" onclick="toggleEditSaleUpgrade()" style="width:100%;padding:9px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s">
+        ↑ Mark as upgrade
+      </button>
+      <div id="editSaleUpgradeHint" style="display:none;font-size:11px;color:var(--text3);margin-top:4px">Upgrade: enter the delta amount the guest paid you</div>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn" style="flex:1" onclick="closeEditSaleModal()">Cancel</button>

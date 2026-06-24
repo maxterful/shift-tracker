@@ -1,4 +1,4 @@
-const CACHE = 'shift-tracker-v1';
+const CACHE = 'shift-tracker-v2';
 const STATIC = [
   '/',
   '/manifest.json',
