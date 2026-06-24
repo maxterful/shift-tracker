@@ -1,11 +1,5 @@
-const CACHE = 'shift-tracker-v2';
-const STATIC = [
-  '/',
-  '/manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js',
-  'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js',
-  'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css',
-];
+const CACHE = 'shift-tracker-v3';
+const STATIC = ['/', '/manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -26,10 +20,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Never intercept API calls — always go to network for these
+  // Only handle same-origin requests — let CDN/API requests go through normally
+  if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
-  // Network-first for same-origin navigation (always fresh HTML)
+  // Network-first for navigation (always get fresh HTML)
   if (e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('/'))
@@ -37,17 +32,16 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache-first for static assets and CDN resources
+  // Cache-first for same-origin static assets
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(resp => {
-        if (resp.ok && (url.origin === self.location.origin || url.origin.includes('jsdelivr.net') || url.origin.includes('cloudflare.com'))) {
-          const clone = resp.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+        if (resp.ok) {
+          caches.open(CACHE).then(c => c.put(e.request, resp.clone()));
         }
         return resp;
-      }).catch(() => cached);
+      });
     })
   );
 });
