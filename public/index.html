@@ -603,9 +603,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="metric-label">Total sales</div>
       <div class="metric-value" id="totalSales">$0</div>
       <div class="metric-sub" id="salesSub">0 transactions</div>
-      <div class="metric-sub" id="totalCommission" style="color:var(--green-mid);margin-top:2px"></div>
     </div>
-    <div class="metric-card mc-green">
+    <div class="metric-card mc-purp" id="commCard">
+      <div class="metric-label">Commission</div>
+      <div class="metric-value" id="totalCommission">$0.00</div>
+      <div class="metric-sub" id="commSub"></div>
+    </div>
+    <div class="metric-card mc-green" id="goalCard">
       <div class="metric-label">vs. goal</div>
       <div class="metric-value" id="goalPct">—</div>
       <div class="progress-bar-wrap"><div class="progress-bar" id="goalBar" style="width:0%"></div></div>
@@ -1235,9 +1239,10 @@ function commTypeFor(product, tier) {
       product.includes('PREMIUM SEATING') || product.includes('FREESTYLE') ||
       product.includes('DARKMOOR') || product.includes('BREAKFAST') ||
       product.includes('CHARACTER DINING') || product.includes('HHN')) return 'ancillary';
-  // 1D Base tickets (USF/IOA only, not PTP) earn no commission
+  // 1D Base tickets (USF/IOA only, not PTP) and Epic Universe 1-day tickets earn no commission
   const is1dBase = product === 'USF/IOA 1D Base AD' || product === 'USF/IOA 1D Base CH' ||
-                   product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH';
+                   product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH' ||
+                   product === 'Epic Universe 1D AD' || product === 'Epic Universe 1D CH';
   if (is1dBase) return 'none';
   return 'admission';
 }
@@ -1937,13 +1942,13 @@ function render() {
 
   document.getElementById('totalSales').textContent  = fmtD(total);
   document.getElementById('salesSub').textContent    = txCount+' ticket'+(txCount!==1?'s':'')+' · '+saleCount+' sale'+(saleCount!==1?'s':'');
-  if (txCount) {
-    const cg = state.commGoal || 0;
-    const commPct = cg > 0 ? Math.round((totalComm / cg) * 100) : null;
-    document.getElementById('totalCommission').textContent =
-      'Commission: ' + fmtD(totalComm) + (cg > 0 ? ' / ' + fmtD(cg) + ' goal (' + commPct + '%)' : '');
+  document.getElementById('totalCommission').textContent = fmtD(totalComm);
+  const cg = state.commGoal || 0;
+  if (cg > 0) {
+    const commPct = Math.round((totalComm / cg) * 100);
+    document.getElementById('commSub').textContent = fmtD(cg) + ' goal · ' + commPct + '%';
   } else {
-    document.getElementById('totalCommission').textContent = '';
+    document.getElementById('commSub').textContent = '';
   }
   if (goalPct !== null) {
     document.getElementById('goalPct').textContent   = Math.round(goalPct)+'%';
