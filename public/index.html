@@ -2178,6 +2178,7 @@ async function renderPastShifts() {
         </div>
         <div class="shc-actions">
           <button class="btn btn-sm" onclick="enterPastEditMode(${sid},'${h.date}')" title="Add sale to this shift">+</button>
+          <button class="btn btn-sm" onclick="openEditShiftModal(${sid})" title="Edit shift">✏</button>
           <button class="btn btn-sm" onclick='openExportModal(${JSON.stringify({name:currentUser?.name,emoji:currentUser?.emoji,date:h.date,totalSales:h.totalSales,goal:h.goal,txCount:h.txCount,totalGuests:h.totalGuests,hotel:h.hotel,duration:h.duration})})' title="Share card">↗</button>
           <button class="btn btn-sm" onclick="exportHistoryCSV(${sid},${i})">CSV</button>
           <button class="trash-btn" onclick="deleteHistoryEntry(${sid},${i})" title="Delete shift">✕</button>
@@ -3435,6 +3436,85 @@ async function deleteAdminUser(id, name) {
   }
 }
 
+// ─── Edit shift modal ─────────────────────────────────────────
+let _editShiftId = null;
+let _eshShiftType = 'A';
+
+function openEditShiftModal(id) {
+  const history = historyCache || [];
+  const shift = history.find(h => h.id === id);
+  if (!shift) return;
+  _editShiftId = id;
+  _eshShiftType = shift.shiftType || 'A';
+  // Build hotel select
+  const sel = document.getElementById('esh-hotel');
+  const labels = { Premier: 'On-Site · Premier', 'Non-Premier': 'On-Site · Non-Premier', UPH: 'Partner Hotels (UPH)' };
+  sel.innerHTML = '<option value="">— No hotel —</option>';
+  for (const [tier, hotels] of Object.entries(HOTEL_TIERS)) {
+    const og = document.createElement('optgroup');
+    og.label = labels[tier];
+    hotels.forEach(h => { const o = document.createElement('option'); o.value = o.textContent = h; og.appendChild(o); });
+    sel.appendChild(og);
+  }
+  if (shift.hotel) sel.value = shift.hotel;
+  document.getElementById('esh-date').value    = shift.date || '';
+  document.getElementById('esh-goal').value    = shift.goal || '';
+  document.getElementById('esh-occ').value     = shift.occ != null ? shift.occ : '';
+  document.getElementById('esh-occType').value = shift.occType || 'Hotel';
+  document.getElementById('esh-notes').value   = shift.notes || '';
+  _updateEshTypeButtons();
+  document.getElementById('editShiftModal').style.display = 'flex';
+}
+
+function closeEditShiftModal() {
+  document.getElementById('editShiftModal').style.display = 'none';
+  _editShiftId = null;
+}
+
+function pickEshShiftType(t) {
+  _eshShiftType = t;
+  _updateEshTypeButtons();
+}
+
+function _updateEshTypeButtons() {
+  document.getElementById('esh-typeA').classList.toggle('active', _eshShiftType === 'A');
+  document.getElementById('esh-typeB').classList.toggle('active', _eshShiftType === 'B');
+}
+
+async function saveEditShift() {
+  if (!_editShiftId) return;
+  const btn = document.getElementById('esh-saveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const hotel     = document.getElementById('esh-hotel').value;
+  const hotelTier = hotel ? tierForHotel(hotel) : 'Premier';
+  const goal      = parseFloat(document.getElementById('esh-goal').value) || 0;
+  const occVal    = document.getElementById('esh-occ').value;
+  const occ       = occVal !== '' ? parseFloat(occVal) : null;
+  const occType   = document.getElementById('esh-occType').value;
+  const notes     = document.getElementById('esh-notes').value.trim();
+  const date      = document.getElementById('esh-date').value.trim();
+  // If hotel changed, recalculate sale commissions for new tier
+  const shift = (historyCache || []).find(h => h.id === _editShiftId);
+  let sales = shift?.sales || [];
+  if (shift && (hotel !== shift.hotel || hotelTier !== shift.hotelTier)) {
+    sales = sales.map(s => ({
+      ...s,
+      commission: calcCommission(s.product, s.preTax ?? (s.amount / 1.065), hotelTier, s.isUpgrade)
+    }));
+  }
+  try {
+    const result = await apiPut('/api/me/history/' + _editShiftId,
+      { hotel: hotel || null, hotelTier, goal, occ, occType, notes, date, shiftType: _eshShiftType, sales });
+    if (!result) { btn.disabled = false; btn.textContent = 'Save changes'; return; }
+    historyCache = null;
+    closeEditShiftModal();
+    renderPastShifts();
+  } catch {
+    alert('Failed to save. Try again.');
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
+
 // ─── Timer ────────────────────────────────────────────────────
 const timerEl=document.getElementById('shiftTimer');
 function updateTimer() {
@@ -3772,6 +3852,54 @@ if (isIOS && !isStandalone) {
 </div>
 
 <!-- Edit sale modal -->
+<div class="past-shift-modal" id="editShiftModal" onclick="if(event.target===this)closeEditShiftModal()" style="display:none">
+  <div class="past-shift-modal-inner">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:700">Edit shift</div>
+      <button onclick="closeEditShiftModal()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text3);line-height:1">✕</button>
+    </div>
+    <div class="input-group">
+      <label>Date</label>
+      <input type="text" id="esh-date" placeholder="e.g. Mon, Jun 23, 2026" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box">
+    </div>
+    <div class="input-group" style="margin-top:10px">
+      <label>Hotel</label>
+      <select id="esh-hotel" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box"></select>
+    </div>
+    <div class="input-group" style="margin-top:10px">
+      <label>Shift type</label>
+      <div style="display:flex;gap:6px">
+        <button class="shift-type-btn active" id="esh-typeA" onclick="pickEshShiftType('A')">A Shift</button>
+        <button class="shift-type-btn" id="esh-typeB" onclick="pickEshShiftType('B')">B Shift</button>
+      </div>
+    </div>
+    <div class="input-group" style="margin-top:10px">
+      <label>Sales goal ($)</label>
+      <input type="number" id="esh-goal" min="0" inputmode="decimal" placeholder="0" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <div class="input-group" style="flex:1">
+        <label>Occupancy (%)</label>
+        <input type="number" id="esh-occ" min="0" max="100" inputmode="decimal" placeholder="—" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box">
+      </div>
+      <div class="input-group" style="flex:1">
+        <label>Type</label>
+        <select id="esh-occType" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box">
+          <option>Hotel</option><option>Walk-in</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-group" style="margin-top:10px">
+      <label>Notes</label>
+      <textarea id="esh-notes" rows="2" placeholder="Shift notes…" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;resize:vertical;box-sizing:border-box"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn" style="flex:1" onclick="closeEditShiftModal()">Cancel</button>
+      <button class="btn btn-primary" style="flex:1" id="esh-saveBtn" onclick="saveEditShift()">Save changes</button>
+    </div>
+  </div>
+</div>
+
 <div class="edit-sale-modal" id="editSaleModal" onclick="if(event.target===this)closeEditSaleModal()">
   <div class="edit-sale-inner">
     <div class="edit-sale-title" id="editSaleTitle">Edit sale</div>
