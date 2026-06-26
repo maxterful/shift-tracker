@@ -311,24 +311,28 @@ const COMM_RATES = {
   thirdParty:    { Premier: 0.01,   'Non-Premier': 0.01,   UPH: 0.01   },
   none:          { Premier: 0,      'Non-Premier': 0,       UPH: 0      },
 };
-function commTypeFor(product) {
+function commTypeFor(product, tier) {
   if (product.includes('VIP TOUR: PRIVATE'))     return 'vipPrivate';
   if (product.includes('VIP TOUR: NON-PRIVATE')) return 'vipNonPrivate';
   if (product.includes('EXPRESS'))               return 'express';
   if (product.includes('LANYARD') || product === 'POUCH ONLY' || product === 'EVENT LANYARD') return 'lanyards';
-  if (product.includes('CONV'))                  return 'upgrades';
+  if (product.includes('CONV'))                  return 'none';
   if (product === 'SeaWorld 1D' || product.includes('I-RIDE')) return 'thirdParty';
-  if (product.includes('PARKING') || product.includes('Superstar Shuttle')) return 'none';
+  if (product.includes('PARKING') || product.includes('Superstar Shuttle') ||
+      product === '1D MILITARY FREEDOM PASS' || product === 'Epic After 2PM Guest Recovery') return 'none';
   if (product.includes('PHOTOS') || product.includes('CABANA') ||
       product.includes('PREMIUM SEATING') || product.includes('FREESTYLE') ||
       product.includes('DARKMOOR') || product.includes('BREAKFAST') ||
       product.includes('CHARACTER DINING') || product.includes('HHN')) return 'ancillary';
-  if (product === 'USF/IOA 1D Base AD' || product === 'USF/IOA 1D Base CH' ||
-      product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH') return 'none';
+  if (product.startsWith('1D VB')) return 'admission';
+  if ((product.includes('1D') || product.includes('1 DAY')) && product.includes('PTP'))
+    return tier === 'UPH' ? 'admission' : 'none';
+  if (product.includes('1D') || product.includes('1 DAY')) return 'none';
   return 'admission';
 }
-function calcCommission(product, preTax, tier) {
-  const rate = (COMM_RATES[commTypeFor(product)] || COMM_RATES.none)[tier] ?? 0;
+function calcCommission(product, preTax, tier, isUpgrade) {
+  if (isUpgrade) return Math.round(preTax * (COMM_RATES.upgrades[tier] ?? 0) * 100) / 100;
+  const rate = (COMM_RATES[commTypeFor(product, tier)] || COMM_RATES.none)[tier] ?? 0;
   return Math.round(preTax * rate * 100) / 100;
 }
 
@@ -344,7 +348,7 @@ app.post('/api/admin/recalc-commissions', adminAuth, (_req, res) => {
       const tier = shift.hotelTier || 'Premier';
       const sales = (shift.sales || []).map(sale => {
         const preTax = sale.preTax ?? (sale.amount / 1.065);
-        const newComm = calcCommission(sale.product || '', preTax, tier);
+        const newComm = calcCommission(sale.product || '', preTax, tier, sale.isUpgrade);
         if (newComm !== sale.commission) { salesUpdated++; changed = true; }
         return { ...sale, commission: newComm };
       });

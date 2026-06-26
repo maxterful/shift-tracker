@@ -1176,13 +1176,16 @@ const PRODUCT_PRICES = {
 const HOTEL_TIERS = {
   'Premier': [
     'Loews Portofino Bay Hotel','Hard Rock Hotel','Loews Royal Pacific Resort',
-    'Loews Sapphire Falls Resort','Universal Helios Grand Hotel',
-    'Universal Aventura Hotel','Universal Stella Nova Resort','Universal Terra Luna Resort',
   ],
   'Non-Premier': [
     'Universal Cabana Bay Beach Resort',
+    'Loews Sapphire Falls Resort',
+    'Universal Aventura Hotel',
     'Endless Summer Resort – Surfside Inn & Suites',
     'Endless Summer Resort – Dockside Inn & Suites',
+    'Universal Stella Nova Resort',
+    'Universal Terra Luna Resort',
+    'Universal Helios Grand Hotel',
   ],
   'UPH': [
     'Avanti International Resort','CoCo Key Hotel & Water Resort',
@@ -1232,27 +1235,29 @@ function commTypeFor(product, tier) {
   if (product.includes('VIP TOUR: NON-PRIVATE')) return 'vipNonPrivate';
   if (product.includes('EXPRESS'))               return 'express';
   if (product.includes('LANYARD') || product === 'POUCH ONLY' || product === 'EVENT LANYARD') return 'lanyards';
-  if (product.includes('BASE CONV'))             return 'none';
-  if (product.includes('CONV'))                  return 'upgrades';
+  // All convention tickets → no commission
+  if (product.includes('CONV'))                  return 'none';
   if (product === 'SeaWorld 1D' || product.includes('I-RIDE')) return 'thirdParty';
   if (product.includes('PARKING') || product.includes('Superstar Shuttle') ||
-      product === '1D MILITARY FREEDOM PASS')    return 'none';
+      product === '1D MILITARY FREEDOM PASS' || product === 'Epic After 2PM Guest Recovery') return 'none';
   if (product.includes('PHOTOS') || product.includes('CABANA') ||
       product.includes('PREMIUM SEATING') || product.includes('FREESTYLE') ||
       product.includes('DARKMOOR') || product.includes('BREAKFAST') ||
       product.includes('CHARACTER DINING') || product.includes('HHN')) return 'ancillary';
-  // No commission: USF/IOA 1D Base, all Epic Universe tickets
-  const noComm = product === 'USF/IOA 1D Base AD' || product === 'USF/IOA 1D Base CH' ||
-                 product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH' ||
-                 product === 'Epic Universe 1D AD' || product === 'Epic Universe 1D CH' ||
-                 product === '1D EPIC AP AD'      || product === 'Epic After 2PM Guest Recovery';
-  if (noComm) return 'none';
+  // VB Single Day earns commission year-round
+  if (product.startsWith('1D VB')) return 'admission';
+  // 1D PTP earns commission only at UPH partner hotels, not on-site
+  if ((product.includes('1D') || product.includes('1 DAY')) && product.includes('PTP'))
+    return tier === 'UPH' ? 'admission' : 'none';
+  // All remaining 1D tickets → no commission
+  if (product.includes('1D') || product.includes('1 DAY')) return 'none';
   return 'admission';
 }
 function commRateFor(product, tier) {
   return COMM_RATES[commTypeFor(product, tier)]?.[tier] ?? 0;
 }
-function calcCommission(product, amount, tier) {
+function calcCommission(product, amount, tier, isUpgrade) {
+  if (isUpgrade) return Math.round(amount * (COMM_RATES.upgrades[tier] ?? 0) * 100) / 100;
   return Math.round(amount * commRateFor(product, tier) * 100) / 100;
 }
 
@@ -2767,7 +2772,7 @@ async function saveEditedSale() {
   const taxRate = state.taxRate ?? 6.5;
   const inclTax = state.priceIncludesTax !== false;
   const preTax = inclTax ? newAmt/(1+taxRate/100) : newAmt;
-  const commission = calcCommission(oldSale.product, preTax, shift.hotelTier || 'Premier');
+  const commission = calcCommission(oldSale.product, preTax, shift.hotelTier || 'Premier', _editSaleIsUpgrade);
   sales[_editSaleSaleIdx] = { ...oldSale, amount: newAmt, unitAmount: newAmt, preTax: Math.round(preTax*100)/100, commission, guests: newGuests, isUpgrade: _editSaleIsUpgrade || undefined };
   closeEditSaleModal();
   try {
@@ -3147,7 +3152,7 @@ async function logSale() {
   const inclTax = pastEditShiftId!==null ? !pastEditPreTax : state.priceIncludesTax!==false;
   const preTax=inclTax ? amt/(1+taxRate/100) : amt;
   const taxAmt=Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
-  const commission=calcCommission(state.selectedProduct,preTax,tier);
+  const commission=calcCommission(state.selectedProduct,preTax,tier,_upgradeMode);
   const sale={product:state.selectedProduct,amount:inclTax?amt:Math.round((amt+taxAmt)*100)/100,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now(),isUpgrade:_upgradeMode||undefined};
 
   if (pastEditShiftId !== null) {
@@ -3213,8 +3218,8 @@ function updateSalePreview() {
   const inclTax = pastEditShiftId!==null ? !pastEditPreTax : state.priceIncludesTax!==false;
   const preTax=inclTax?amt/(1+taxRate/100):amt;
   const taxAmt=inclTax?amt-preTax:amt*taxRate/100;
-  const commission=calcCommission(state.selectedProduct,preTax,tier);
-  const rate=commRateFor(state.selectedProduct,tier);
+  const commission=calcCommission(state.selectedProduct,preTax,tier,_upgradeMode);
+  const rate=_upgradeMode ? (COMM_RATES.upgrades[tier]??0) : commRateFor(state.selectedProduct,tier);
   el.style.display='';
   const unitPre=inclTax?unitAmt/(1+taxRate/100):unitAmt;
   document.getElementById('previewPreTax').textContent=fmtD(preTax)+(guests>1?' ('+guests+'×'+fmtD(unitPre)+')':'');
