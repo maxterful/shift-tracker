@@ -1145,7 +1145,7 @@ const PRODUCT_PRICES = {
   '1D FREESTYLE CUP': 21.29, '2D FREESTYLE CUP': 38.32, '3D FREESTYLE CUP': 51.09,
   '4D FREESTYLE CUP': 68.12, '5D FREESTYLE CUP': 85.15,
   // Breakfast
-  'LEAKY CAULDRON BREAKFAST AD': 21.29, 'LEAKY CAULDRON BREAKFAST CH': 21.29,
+  'LEAKY CAULDRON BREAKFAST AD': 21.29, 'LEAKY CAULDRON BREAKFAST CH': 14.90,
   'THREE BROOMSTICKS BREAKFAST AD': 21.29, 'THREE BROOMSTICKS BREAKFAST CH': 21.29,
   // Lanyards
   'LANYARD AND POUCH COMBO': 21.29, 'POTTER LANYARD AND POUCH COMBO': 21.29,
@@ -1232,18 +1232,21 @@ function commTypeFor(product, tier) {
   if (product.includes('VIP TOUR: NON-PRIVATE')) return 'vipNonPrivate';
   if (product.includes('EXPRESS'))               return 'express';
   if (product.includes('LANYARD') || product === 'POUCH ONLY' || product === 'EVENT LANYARD') return 'lanyards';
+  if (product.includes('BASE CONV'))             return 'none';
   if (product.includes('CONV'))                  return 'upgrades';
   if (product === 'SeaWorld 1D' || product.includes('I-RIDE')) return 'thirdParty';
-  if (product.includes('PARKING') || product.includes('Superstar Shuttle')) return 'none';
+  if (product.includes('PARKING') || product.includes('Superstar Shuttle') ||
+      product === '1D MILITARY FREEDOM PASS')    return 'none';
   if (product.includes('PHOTOS') || product.includes('CABANA') ||
       product.includes('PREMIUM SEATING') || product.includes('FREESTYLE') ||
       product.includes('DARKMOOR') || product.includes('BREAKFAST') ||
       product.includes('CHARACTER DINING') || product.includes('HHN')) return 'ancillary';
-  // 1D Base tickets (USF/IOA only, not PTP) and Epic Universe 1-day tickets earn no commission
-  const is1dBase = product === 'USF/IOA 1D Base AD' || product === 'USF/IOA 1D Base CH' ||
-                   product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH' ||
-                   product === 'Epic Universe 1D AD' || product === 'Epic Universe 1D CH';
-  if (is1dBase) return 'none';
+  // No commission: USF/IOA 1D Base, all Epic Universe tickets
+  const noComm = product === 'USF/IOA 1D Base AD' || product === 'USF/IOA 1D Base CH' ||
+                 product === 'FL USF/IOA 1D BASE AD' || product === 'FL USF/IOA 1D BASE CH' ||
+                 product === 'Epic Universe 1D AD' || product === 'Epic Universe 1D CH' ||
+                 product === '1D EPIC AP AD'      || product === 'Epic After 2PM Guest Recovery';
+  if (noComm) return 'none';
   return 'admission';
 }
 function commRateFor(product, tier) {
