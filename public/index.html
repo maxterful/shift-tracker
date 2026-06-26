@@ -100,6 +100,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .login-logo { font-size: 32px; margin-bottom: 8px; }
 .login-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
 .login-sub { font-size: 14px; color: var(--text2); margin-bottom: 1.5rem; }
+.welcome-features { display: flex; flex-direction: column; gap: 10px; margin: 1.25rem 0; }
+.welcome-feature { display: flex; align-items: flex-start; gap: 12px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.welcome-feature-icon { font-size: 22px; flex-shrink: 0; line-height: 1; }
+.welcome-feature-text { flex: 1; }
+.welcome-feature-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.welcome-feature-desc { font-size: 12px; color: var(--text2); line-height: 1.4; }
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -478,6 +484,52 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 <!-- ─── Login Screen ──────────────────────────────────────── -->
 <div id="loginScreen" class="login-wrap">
   <div class="login-box">
+
+    <!-- Welcome / how it works -->
+    <div id="viewWelcome" style="display:none">
+      <div class="login-logo">🏝️</div>
+      <h2 class="login-title">Shift Tracker</h2>
+      <p class="login-sub" style="margin-bottom:0.5rem">Built for Universal Orlando Vacation Planners</p>
+      <div class="welcome-features">
+        <div class="welcome-feature">
+          <div class="welcome-feature-icon">💰</div>
+          <div class="welcome-feature-text">
+            <div class="welcome-feature-title">Log sales & track commission</div>
+            <div class="welcome-feature-desc">Select a product, enter the amount, and the app instantly calculates your commission based on your hotel tier. See your total earnings update live throughout the shift.</div>
+          </div>
+        </div>
+        <div class="welcome-feature">
+          <div class="welcome-feature-icon">📊</div>
+          <div class="welcome-feature-text">
+            <div class="welcome-feature-title">Real-time shift dashboard</div>
+            <div class="welcome-feature-desc">Track your total sales, conversion rate, average sale, occupancy, and sales pace — all in one view. Set a daily goal and see your progress as you go.</div>
+          </div>
+        </div>
+        <div class="welcome-feature">
+          <div class="welcome-feature-icon">🏆</div>
+          <div class="welcome-feature-text">
+            <div class="welcome-feature-title">Team leaderboard</div>
+            <div class="welcome-feature-desc">See where you rank against your team in real time. Weekly and monthly views let you track streaks and projected commission for the period.</div>
+          </div>
+        </div>
+        <div class="welcome-feature">
+          <div class="welcome-feature-icon">📅</div>
+          <div class="welcome-feature-text">
+            <div class="welcome-feature-title">Full shift history</div>
+            <div class="welcome-feature-desc">Every completed shift is saved with your sales breakdown, personal bests, and day-of-week performance charts. Edit or add to past shifts at any time.</div>
+          </div>
+        </div>
+        <div class="welcome-feature">
+          <div class="welcome-feature-icon">📶</div>
+          <div class="welcome-feature-text">
+            <div class="welcome-feature-title">Works offline</div>
+            <div class="welcome-feature-desc">Sales log even when you're off the network and sync automatically when you're back online. Install to your home screen for a native app experience.</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="showView('profiles')" style="width:100%;margin-bottom:10px">Get started</button>
+      <p style="font-size:12px;color:var(--text3);text-align:center">Your data is private to your profile and secured by your PIN.</p>
+    </div>
 
     <!-- Profile selection -->
     <div id="viewProfiles">
@@ -1420,8 +1472,10 @@ let selectedEmoji = EMOJIS[0];
 let selectedColor = COLORS[0];
 
 function showView(v) {
+  document.getElementById('viewWelcome').style.display  = v === 'welcome'  ? '' : 'none';
   document.getElementById('viewProfiles').style.display = v === 'profiles' ? '' : 'none';
   document.getElementById('viewCreate').style.display   = v === 'create'   ? '' : 'none';
+  if (v === 'profiles') { loadProfiles(); localStorage.setItem('seenWelcome', '1'); }
   if (v === 'create') buildCreateForm();
 }
 
@@ -1616,8 +1670,11 @@ async function recoverClosedShiftIfNeeded() {
 function showLoginScreen() {
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('mainApp').style.display     = 'none';
-  showView('profiles');
-  loadProfiles();
+  if (localStorage.getItem('seenWelcome')) {
+    showView('profiles');
+  } else {
+    showView('welcome');
+  }
 }
 function showMainApp() {
   document.getElementById('loginScreen').style.display = 'none';
