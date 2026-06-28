@@ -538,6 +538,38 @@ app.post('/api/me/pin', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Time-off requests ─────────────────────────────────────
+const TIMEOFF_FILE = path.join(DATA, 'time-off.json');
+
+app.get('/api/time-off', auth, (req, res) => {
+  res.json(read(TIMEOFF_FILE, []));
+});
+
+app.post('/api/time-off', auth, (req, res) => {
+  const { date, note } = req.body;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'Invalid date' });
+  const users = read(path.join(DATA, 'users.json'), []);
+  const user  = users.find(u => u.id === req.uid);
+  if (!user) return res.status(404).json({ error: 'Not found' });
+  const requests = read(TIMEOFF_FILE, []);
+  if (requests.some(r => r.userId === req.uid && r.date === date))
+    return res.status(409).json({ error: 'Already requested' });
+  const entry = { id: Date.now(), userId: req.uid, userName: user.name, userEmoji: user.emoji, userColor: user.color, date, note: (note||'').trim().slice(0,200), ts: Date.now() };
+  requests.push(entry);
+  write(TIMEOFF_FILE, requests);
+  res.json({ ok: true, entry });
+});
+
+app.delete('/api/time-off/:id', auth, (req, res) => {
+  const requests = read(TIMEOFF_FILE, []);
+  const idx = requests.findIndex(r => r.id === Number(req.params.id));
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  if (requests[idx].userId !== req.uid) return res.status(403).json({ error: 'Not yours' });
+  requests.splice(idx, 1);
+  write(TIMEOFF_FILE, requests);
+  res.json({ ok: true });
+});
+
 // ── Chat ──────────────────────────────────────────────────
 const CHAT_FILE = path.join(DATA, 'chat.json');
 const MAX_CHAT  = 500;

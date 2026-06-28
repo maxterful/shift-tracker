@@ -364,15 +364,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .past-stat-lbl { font-size: 11px; color: var(--text3); margin-top: 3px; font-weight: 500; }
 /* Calendar */
 .cal-header-cell { text-align:center; color:var(--text3); font-weight:700; padding:4px 0; }
-.cal-day { min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:5px 2px 4px; border-radius:8px; cursor:default; position:relative; gap:2px; }
-.cal-day.has-shift { cursor:pointer; }
-.cal-day.has-shift:hover { background:var(--bg2); }
+.cal-day { min-height:52px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:5px 2px 4px; border-radius:8px; cursor:pointer; position:relative; gap:2px; }
+.cal-day:hover { background:var(--bg2); }
 .cal-day.today { background:var(--blue-dark); }
 .cal-day.selected { outline:2px solid var(--blue-mid); background:var(--bg2); }
 .cal-day.other-month { opacity:0.25; pointer-events:none; }
 .cal-day-num { font-size:12px; font-weight:600; line-height:1; }
 .cal-day-amt { font-size:10px; font-weight:700; line-height:1.1; margin-top:2px; }
 .cal-day-bar { width:80%; height:3px; border-radius:2px; margin-top:2px; }
+.cal-day-off-dots { display:flex; flex-wrap:wrap; justify-content:center; gap:1px; margin-top:2px; line-height:1; }
+.cal-day-off-dot { font-size:9px; line-height:1; }
+.timeoff-req { display:flex; align-items:center; gap:8px; background:var(--amber-bg); border:0.5px solid var(--amber-border); border-radius:var(--radius); padding:8px 10px; font-size:12px; }
+.timeoff-req-avatar { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+.timeoff-mine-note { flex:1; font-size:12px; padding:7px 10px; border-radius:var(--radius); border:1px solid var(--border2); background:var(--bg); color:var(--text); font-family:inherit; }
+.cal-add-off-row { display:flex; gap:6px; margin-top:8px; }
+.cal-add-off-row input { flex:1; font-size:12px; padding:7px 10px; border-radius:var(--radius); border:1px solid var(--border2); background:var(--bg); color:var(--text); font-family:inherit; }
+.cal-add-off-row input:focus { outline:none; border-color:var(--amber-mid); }
 /* Milestone toast */
 .milestone-toast { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.8); background:var(--green-dark); color:#fff; border-radius:20px; padding:20px 28px; text-align:center; z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s,transform 0.25s; box-shadow:0 8px 40px rgba(0,0,0,0.4); min-width:220px; }
 .milestone-toast.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
@@ -2412,6 +2419,7 @@ let _calView = false;
 let _calYear = new Date().getFullYear();
 let _calMonth = new Date().getMonth();
 let _calSelected = null;
+let _timeOffCache = null;
 
 function toggleCalendarView() {
   _calView = !_calView;
@@ -2424,15 +2432,26 @@ function toggleCalendarView() {
   if (_calView) renderCalendar();
 }
 
+async function getTimeOff() {
+  if (_timeOffCache) return _timeOffCache;
+  try { _timeOffCache = await apiGet('/api/time-off') || []; } catch { _timeOffCache = []; }
+  return _timeOffCache;
+}
+
 async function renderCalendar() {
-  const history = await getHistory();
-  // Build a map of dateStr → [{totalSales, goal, hotel}]
-  const byDate = {};
+  const [history, timeOff] = await Promise.all([getHistory(), getTimeOff()]);
+
+  // Build maps: dateStr → shifts / time-off requests
+  const byDate = {}, byDateOff = {};
   history.forEach(h => {
     if (!h.shiftStart) return;
     const d = new Date(h.shiftStart).toLocaleDateString('en-CA');
     if (!byDate[d]) byDate[d] = [];
     byDate[d].push(h);
+  });
+  timeOff.forEach(r => {
+    if (!byDateOff[r.date]) byDateOff[r.date] = [];
+    byDateOff[r.date].push(r);
   });
 
   const label = document.getElementById('calMonthLabel');
@@ -2440,37 +2459,37 @@ async function renderCalendar() {
   label.textContent = new Date(_calYear, _calMonth, 1).toLocaleDateString([], { month: 'long', year: 'numeric' });
 
   const today = new Date().toLocaleDateString('en-CA');
-  const firstDay = new Date(_calYear, _calMonth, 1).getDay();
+  const firstDay   = new Date(_calYear, _calMonth, 1).getDay();
   const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
   const daysInPrev  = new Date(_calYear, _calMonth, 0).getDate();
 
   const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
   let html = days.map(d => `<div class="cal-header-cell">${d}</div>`).join('');
 
-  // Pad start
   for (let i = 0; i < firstDay; i++) {
     const day = daysInPrev - firstDay + 1 + i;
     html += `<div class="cal-day other-month"><span class="cal-day-num">${day}</span></div>`;
   }
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const shifts  = byDate[dateStr] || [];
-    const isToday = dateStr === today;
-    const isSel   = dateStr === _calSelected;
+    const dateStr  = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const shifts   = byDate[dateStr] || [];
+    const offReqs  = byDateOff[dateStr] || [];
+    const isToday  = dateStr === today;
+    const isSel    = dateStr === _calSelected;
     const dayTotal = shifts.reduce((a, h) => a + (h.totalSales || 0), 0);
     const anyGoalHit = shifts.some(h => h.goal > 0 && h.totalSales >= h.goal);
-    const allZero = shifts.length > 0 && shifts.every(h => !h.totalSales);
+    const allZero  = shifts.length > 0 && shifts.every(h => !h.totalSales);
     const barColor = allZero ? '#64748b' : anyGoalHit ? '#34d399' : '#60a5fa';
-    const amtStr = dayTotal >= 1000 ? '$' + (dayTotal/1000).toFixed(1) + 'k' : dayTotal > 0 ? '$' + Math.round(dayTotal) : shifts.length ? '$0' : '';
-    const hasShift = shifts.length > 0;
-    html += `<div class="cal-day${hasShift?' has-shift':''}${isToday?' today':''}${isSel?' selected':''}"${hasShift?` onclick="calSelectDay('${dateStr}')"`:''}>
-      <span class="cal-day-num" style="color:${isToday?'#fff':hasShift?'var(--text)':'var(--text3)'}">${d}</span>
-      ${hasShift ? `<span class="cal-day-amt" style="color:${isToday?'#fff':barColor}">${amtStr}</span><div class="cal-day-bar" style="background:${barColor}"></div>` : ''}
+    const amtStr   = dayTotal >= 1000 ? '$'+(dayTotal/1000).toFixed(1)+'k' : dayTotal > 0 ? '$'+Math.round(dayTotal) : shifts.length ? '$0' : '';
+    const offDots  = offReqs.length ? `<div class="cal-day-off-dots">${offReqs.map(r=>`<span class="cal-day-off-dot" title="${r.userName} day off">${r.userEmoji||'🏖'}</span>`).join('')}</div>` : '';
+    html += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" onclick="calSelectDay('${dateStr}')">
+      <span class="cal-day-num" style="color:${isToday?'#fff':shifts.length?'var(--text)':'var(--text3)'}">${d}</span>
+      ${shifts.length ? `<span class="cal-day-amt" style="color:${isToday?'#fff':barColor}">${amtStr}</span><div class="cal-day-bar" style="background:${barColor}"></div>` : ''}
       ${shifts.length > 1 ? `<span style="font-size:9px;color:${isToday?'rgba(255,255,255,.7)':'var(--text3)'}">${shifts.length} shifts</span>` : ''}
+      ${offDots}
     </div>`;
   }
-  // Pad end to fill 6 rows
-  const total = firstDay + daysInMonth;
+  const total  = firstDay + daysInMonth;
   const endPad = total % 7 === 0 ? 0 : 7 - (total % 7);
   for (let i = 1; i <= endPad; i++)
     html += `<div class="cal-day other-month"><span class="cal-day-num">${i}</span></div>`;
@@ -2480,27 +2499,90 @@ async function renderCalendar() {
 }
 
 async function calSelectDay(dateStr, noToggle) {
-  if (!noToggle && _calSelected === dateStr) { _calSelected = null; document.getElementById('calDayDetail').innerHTML = ''; renderCalendar(); return; }
+  if (!noToggle && _calSelected === dateStr) {
+    _calSelected = null;
+    document.getElementById('calDayDetail').innerHTML = '';
+    renderCalendar(); return;
+  }
   _calSelected = dateStr;
-  const history = await getHistory();
-  const shifts = history.filter(h => h.shiftStart && new Date(h.shiftStart).toLocaleDateString('en-CA') === dateStr);
-  const detail = document.getElementById('calDayDetail');
-  if (!shifts.length) { detail.innerHTML = ''; renderCalendar(); return; }
-  detail.innerHTML = `<div style="border-top:0.5px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px">` +
-    shifts.map(h => {
-      const gp = h.goal > 0 ? Math.round(h.totalSales / h.goal * 100) : null;
-      return `<div style="background:var(--bg2);border-radius:var(--radius);padding:10px 12px;font-size:13px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <span style="font-weight:700">${fmt(h.totalSales)}</span>
-            ${gp!==null?`<span style="font-size:11px;color:${gp>=100?'var(--green-mid)':'var(--text3)'};margin-left:6px">${gp}% of goal</span>`:''}
+  const [history, timeOff] = await Promise.all([getHistory(), getTimeOff()]);
+  const shifts  = history.filter(h => h.shiftStart && new Date(h.shiftStart).toLocaleDateString('en-CA') === dateStr);
+  const offReqs = timeOff.filter(r => r.date === dateStr);
+  const detail  = document.getElementById('calDayDetail');
+  const fmtDate = new Date(dateStr + 'T12:00:00').toLocaleDateString([], { weekday:'long', month:'long', day:'numeric' });
+  const myReq   = offReqs.find(r => r.userId === currentUser?.id);
+
+  let html = `<div style="border-top:0.5px solid var(--border);padding-top:12px">
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text)">${fmtDate}</div>`;
+
+  // Shift cards
+  if (shifts.length) {
+    html += `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">` +
+      shifts.map(h => {
+        const gp = h.goal > 0 ? Math.round(h.totalSales / h.goal * 100) : null;
+        return `<div style="background:var(--bg2);border-radius:var(--radius);padding:10px 12px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><span style="font-weight:700">${fmt(h.totalSales)}</span>
+              ${gp!==null?`<span style="font-size:11px;color:${gp>=100?'var(--green-mid)':'var(--text3)'};margin-left:6px">${gp}% of goal</span>`:''}
+            </div>
+            <span style="font-size:11px;color:var(--text3)">${h.startTime||''}${h.endTime?' – '+h.endTime:''}</span>
           </div>
-          <span style="font-size:11px;color:var(--text3)">${h.startTime||''}${h.endTime?' – '+h.endTime:''}</span>
-        </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">${[h.hotel,h.shiftType?h.shiftType+' Shift':null,h.txCount+' sale'+(h.txCount!==1?'s':'')].filter(Boolean).join(' · ')}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">${[h.hotel,h.shiftType?h.shiftType+' Shift':null,h.txCount+' sale'+(h.txCount!==1?'s':'')].filter(Boolean).join(' · ')}</div>
+        </div>`;
+      }).join('') + '</div>';
+  }
+
+  // Day-off section
+  if (offReqs.length) {
+    html += `<div style="font-size:11px;font-weight:700;color:var(--amber-mid);margin-bottom:6px">🏖 Day-off requests</div>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">` +
+      offReqs.map(r => {
+        const isMe = r.userId === currentUser?.id;
+        return `<div class="timeoff-req">
+          <div class="timeoff-req-avatar" style="background:${r.userColor||'var(--amber-mid)'}">${r.userEmoji||'😊'}</div>
+          <div style="flex:1">
+            <div style="font-weight:600;color:var(--text)">${isMe?'You':r.userName}</div>
+            ${r.note?`<div style="color:var(--text3);margin-top:1px">${escChatHtml(r.note)}</div>`:''}
+          </div>
+          ${isMe?`<button class="btn btn-danger btn-sm" style="font-size:11px;padding:3px 8px" onclick="deleteTimeOff(${r.id},'${dateStr}')">Remove</button>`:''}
+        </div>`;
+      }).join('') + '</div>';
+  }
+
+  // Add request form (only if user hasn't already requested this day)
+  if (!myReq) {
+    html += `<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">Request this day off</div>
+      <div class="cal-add-off-row">
+        <input type="text" id="calOffNote" placeholder="Optional note (e.g. PTO, appointment…)" maxlength="200"
+          onkeydown="if(event.key==='Enter')submitTimeOff('${dateStr}')">
+        <button class="btn btn-sm" style="background:var(--amber-mid);color:#fff;border-color:var(--amber-mid);white-space:nowrap;flex-shrink:0" onclick="submitTimeOff('${dateStr}')">+ Add request</button>
       </div>`;
-    }).join('') + '</div>';
+  }
+
+  html += '</div>';
+  detail.innerHTML = html;
   renderCalendar();
+}
+
+async function submitTimeOff(dateStr) {
+  const note = (document.getElementById('calOffNote')?.value || '').trim();
+  try {
+    await apiPost('/api/time-off', { date: dateStr, note });
+    _timeOffCache = null;
+    await calSelectDay(dateStr, true);
+  } catch(e) {
+    if (e.message === '409') alert('You already have a request for this day.');
+    else alert('Failed to add request. Try again.');
+  }
+}
+
+async function deleteTimeOff(id, dateStr) {
+  if (!confirm('Remove your day-off request?')) return;
+  try {
+    await apiDelete('/api/time-off/' + id);
+    _timeOffCache = null;
+    await calSelectDay(dateStr, true);
+  } catch { alert('Failed to remove. Try again.'); }
 }
 
 function calNav(dir) {
