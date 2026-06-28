@@ -2505,6 +2505,11 @@ async function calSelectDay(dateStr, noToggle) {
     return;
   }
   _calSelected = dateStr;
+  // Immediately highlight the cell and show a loading placeholder so the UI doesn't appear frozen
+  document.querySelectorAll('#calGrid .cal-day[data-date]').forEach(el =>
+    el.classList.toggle('selected', el.dataset.date === _calSelected));
+  document.getElementById('calDayDetail').innerHTML =
+    '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">Loading…</div>';
   const [history, timeOff] = await Promise.all([getHistory(), getTimeOff()]);
   const shifts  = history.filter(h => h.shiftStart && new Date(h.shiftStart).toLocaleDateString('en-CA') === dateStr);
   const offReqs = timeOff.filter(r => r.date === dateStr);
@@ -2561,8 +2566,6 @@ async function calSelectDay(dateStr, noToggle) {
 
   html += '</div>';
   detail.innerHTML = html;
-  document.querySelectorAll('#calGrid .cal-day[data-date]').forEach(el =>
-    el.classList.toggle('selected', el.dataset.date === _calSelected));
 }
 
 async function submitTimeOff(dateStr) {
