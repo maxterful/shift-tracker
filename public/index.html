@@ -372,14 +372,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .cal-day-num { font-size:12px; font-weight:600; line-height:1; }
 .cal-day-amt { font-size:10px; font-weight:700; line-height:1.1; margin-top:2px; }
 .cal-day-bar { width:80%; height:3px; border-radius:2px; margin-top:2px; }
-.cal-day-off-dots { display:flex; flex-wrap:wrap; justify-content:center; gap:1px; margin-top:2px; line-height:1; }
-.cal-day-off-dot { font-size:9px; line-height:1; }
-.timeoff-req { display:flex; align-items:center; gap:8px; background:var(--amber-bg); border:0.5px solid var(--amber-border); border-radius:var(--radius); padding:8px 10px; font-size:12px; }
-.timeoff-req-avatar { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
-.timeoff-mine-note { flex:1; font-size:12px; padding:7px 10px; border-radius:var(--radius); border:1px solid var(--border2); background:var(--bg); color:var(--text); font-family:inherit; }
-.cal-add-off-row { display:flex; gap:6px; margin-top:8px; }
-.cal-add-off-row input { flex:1; font-size:12px; padding:7px 10px; border-radius:var(--radius); border:1px solid var(--border2); background:var(--bg); color:var(--text); font-family:inherit; }
-.cal-add-off-row input:focus { outline:none; border-color:var(--amber-mid); }
 /* Milestone toast */
 .milestone-toast { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.8); background:var(--green-dark); color:#fff; border-radius:20px; padding:20px 28px; text-align:center; z-index:500; opacity:0; pointer-events:none; transition:opacity 0.25s,transform 0.25s; box-shadow:0 8px 40px rgba(0,0,0,0.4); min-width:220px; }
 .milestone-toast.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
@@ -2419,8 +2411,6 @@ let _calView = false;
 let _calYear = new Date().getFullYear();
 let _calMonth = new Date().getMonth();
 let _calSelected = null;
-let _timeOffCache = null;
-
 function toggleCalendarView() {
   _calView = !_calView;
   const btn = document.getElementById('calToggleBtn');
@@ -2432,26 +2422,15 @@ function toggleCalendarView() {
   if (_calView) renderCalendar();
 }
 
-async function getTimeOff() {
-  if (_timeOffCache) return _timeOffCache;
-  try { _timeOffCache = await apiGet('/api/time-off') || []; } catch { _timeOffCache = []; }
-  return _timeOffCache;
-}
-
 async function renderCalendar() {
-  const [history, timeOff] = await Promise.all([getHistory(), getTimeOff()]);
+  const history = historyCache || await getHistory();
 
-  // Build maps: dateStr → shifts / time-off requests
-  const byDate = {}, byDateOff = {};
+  const byDate = {};
   history.forEach(h => {
     if (!h.shiftStart) return;
     const d = new Date(h.shiftStart).toLocaleDateString('en-CA');
     if (!byDate[d]) byDate[d] = [];
     byDate[d].push(h);
-  });
-  timeOff.forEach(r => {
-    if (!byDateOff[r.date]) byDateOff[r.date] = [];
-    byDateOff[r.date].push(r);
   });
 
   const label = document.getElementById('calMonthLabel');
@@ -2473,7 +2452,6 @@ async function renderCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr  = `${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const shifts   = byDate[dateStr] || [];
-    const offReqs  = byDateOff[dateStr] || [];
     const isToday  = dateStr === today;
     const isSel    = dateStr === _calSelected;
     const dayTotal = shifts.reduce((a, h) => a + (h.totalSales || 0), 0);
@@ -2481,12 +2459,10 @@ async function renderCalendar() {
     const allZero  = shifts.length > 0 && shifts.every(h => !h.totalSales);
     const barColor = allZero ? '#64748b' : anyGoalHit ? '#34d399' : '#60a5fa';
     const amtStr   = dayTotal >= 1000 ? '$'+(dayTotal/1000).toFixed(1)+'k' : dayTotal > 0 ? '$'+Math.round(dayTotal) : shifts.length ? '$0' : '';
-    const offDots  = offReqs.length ? `<div class="cal-day-off-dots">${offReqs.map(r=>`<span class="cal-day-off-dot" title="${r.userName} day off">${r.userEmoji||'🏖'}</span>`).join('')}</div>` : '';
     html += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" data-date="${dateStr}" onclick="calSelectDay('${dateStr}')">
       <span class="cal-day-num" style="color:${isToday?'#fff':shifts.length?'var(--text)':'var(--text3)'}">${d}</span>
       ${shifts.length ? `<span class="cal-day-amt" style="color:${isToday?'#fff':barColor}">${amtStr}</span><div class="cal-day-bar" style="background:${barColor}"></div>` : ''}
       ${shifts.length > 1 ? `<span style="font-size:9px;color:${isToday?'rgba(255,255,255,.7)':'var(--text3)'}">${shifts.length} shifts</span>` : ''}
-      ${offDots}
     </div>`;
   }
   const total  = firstDay + daysInMonth;
@@ -2497,96 +2473,44 @@ async function renderCalendar() {
   grid.innerHTML = html;
 }
 
-async function calSelectDay(dateStr, noToggle) {
-  if (!noToggle && _calSelected === dateStr) {
+function calSelectDay(dateStr) {
+  if (_calSelected === dateStr) {
     _calSelected = null;
     document.getElementById('calDayDetail').innerHTML = '';
     document.querySelectorAll('#calGrid .cal-day[data-date]').forEach(el => el.classList.remove('selected'));
     return;
   }
   _calSelected = dateStr;
-  // Immediately highlight the cell and show a loading placeholder so the UI doesn't appear frozen
   document.querySelectorAll('#calGrid .cal-day[data-date]').forEach(el =>
     el.classList.toggle('selected', el.dataset.date === _calSelected));
-  document.getElementById('calDayDetail').innerHTML =
-    '<div style="padding:16px;color:var(--text3);font-size:13px;text-align:center">Loading…</div>';
-  const [history, timeOff] = await Promise.all([getHistory(), getTimeOff()]);
+
+  const history = historyCache || [];
   const shifts  = history.filter(h => h.shiftStart && new Date(h.shiftStart).toLocaleDateString('en-CA') === dateStr);
-  const offReqs = timeOff.filter(r => r.date === dateStr);
   const detail  = document.getElementById('calDayDetail');
   const fmtDate = new Date(dateStr + 'T12:00:00').toLocaleDateString([], { weekday:'long', month:'long', day:'numeric' });
-  const myReq   = offReqs.find(r => r.userId === currentUser?.id);
 
   let html = `<div style="border-top:0.5px solid var(--border);padding-top:12px">
     <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text)">${fmtDate}</div>`;
 
-  // Shift cards
   if (shifts.length) {
-    html += `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">` +
-      shifts.map(h => {
-        const gp = h.goal > 0 ? Math.round(h.totalSales / h.goal * 100) : null;
-        return `<div style="background:var(--bg2);border-radius:var(--radius);padding:10px 12px;font-size:13px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><span style="font-weight:700">${fmt(h.totalSales)}</span>
-              ${gp!==null?`<span style="font-size:11px;color:${gp>=100?'var(--green-mid)':'var(--text3)'};margin-left:6px">${gp}% of goal</span>`:''}
-            </div>
-            <span style="font-size:11px;color:var(--text3)">${h.startTime||''}${h.endTime?' – '+h.endTime:''}</span>
+    html += shifts.map(h => {
+      const gp = h.goal > 0 ? Math.round(h.totalSales / h.goal * 100) : null;
+      return `<div style="background:var(--bg2);border-radius:var(--radius);padding:10px 12px;font-size:13px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><span style="font-weight:700">${fmt(h.totalSales)}</span>
+            ${gp!==null?`<span style="font-size:11px;color:${gp>=100?'var(--green-mid)':'var(--text3)'};margin-left:6px">${gp}% of goal</span>`:''}
           </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">${[h.hotel,h.shiftType?h.shiftType+' Shift':null,h.txCount+' sale'+(h.txCount!==1?'s':'')].filter(Boolean).join(' · ')}</div>
-        </div>`;
-      }).join('') + '</div>';
-  }
-
-  // Day-off section
-  if (offReqs.length) {
-    html += `<div style="font-size:11px;font-weight:700;color:var(--amber-mid);margin-bottom:6px">🏖 Day-off requests</div>
-      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">` +
-      offReqs.map(r => {
-        const isMe = r.userId === currentUser?.id;
-        return `<div class="timeoff-req">
-          <div class="timeoff-req-avatar" style="background:${r.userColor||'var(--amber-mid)'}">${r.userEmoji||'😊'}</div>
-          <div style="flex:1">
-            <div style="font-weight:600;color:var(--text)">${isMe?'You':r.userName}</div>
-            ${r.note?`<div style="color:var(--text3);margin-top:1px">${escChatHtml(r.note)}</div>`:''}
-          </div>
-          ${isMe?`<button class="btn btn-danger btn-sm" style="font-size:11px;padding:3px 8px" onclick="deleteTimeOff(${r.id},'${dateStr}')">Remove</button>`:''}
-        </div>`;
-      }).join('') + '</div>';
-  }
-
-  // Add request form (only if user hasn't already requested this day)
-  if (!myReq) {
-    html += `<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">Request this day off</div>
-      <div class="cal-add-off-row">
-        <input type="text" id="calOffNote" placeholder="Optional note (e.g. PTO, appointment…)" maxlength="200"
-          onkeydown="if(event.key==='Enter')submitTimeOff('${dateStr}')">
-        <button class="btn btn-sm" style="background:var(--amber-mid);color:#fff;border-color:var(--amber-mid);white-space:nowrap;flex-shrink:0" onclick="submitTimeOff('${dateStr}')">+ Add request</button>
+          <span style="font-size:11px;color:var(--text3)">${h.startTime||''}${h.endTime?' – '+h.endTime:''}</span>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">${[h.hotel,h.shiftType?h.shiftType+' Shift':null,h.txCount+' sale'+(h.txCount!==1?'s':'')].filter(Boolean).join(' · ')}</div>
       </div>`;
+    }).join('');
+  } else {
+    html += `<div style="font-size:12px;color:var(--text3)">No shifts logged this day.</div>`;
   }
 
   html += '</div>';
   detail.innerHTML = html;
-}
-
-async function submitTimeOff(dateStr) {
-  const note = (document.getElementById('calOffNote')?.value || '').trim();
-  try {
-    await apiPost('/api/time-off', { date: dateStr, note });
-    _timeOffCache = null;
-    await calSelectDay(dateStr, true);
-  } catch(e) {
-    if (e.message === '409') alert('You already have a request for this day.');
-    else alert('Failed to add request. Try again.');
-  }
-}
-
-async function deleteTimeOff(id, dateStr) {
-  if (!confirm('Remove your day-off request?')) return;
-  try {
-    await apiDelete('/api/time-off/' + id);
-    _timeOffCache = null;
-    await calSelectDay(dateStr, true);
-  } catch { alert('Failed to remove. Try again.'); }
 }
 
 function calNav(dir) {
@@ -3716,6 +3640,17 @@ async function sendChat() {
 let _editShiftId = null;
 let _eshShiftType = 'A';
 
+// Convert stored time strings ("10:30 AM" or "10:30") to HH:MM for <input type="time">
+function _toInputTime(t) {
+  if (!t) return '';
+  const m = t.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+  if (!m) return '';
+  let h = parseInt(m[1]), min = m[2], ampm = (m[3] || '').toUpperCase();
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return `${String(h).padStart(2,'0')}:${min}`;
+}
+
 function openEditShiftModal(id) {
   const history = historyCache || [];
   const shift = history.find(h => h.id === id);
@@ -3733,11 +3668,13 @@ function openEditShiftModal(id) {
     sel.appendChild(og);
   }
   if (shift.hotel) sel.value = shift.hotel;
-  document.getElementById('esh-date').value    = shift.date || '';
-  document.getElementById('esh-goal').value    = shift.goal || '';
-  document.getElementById('esh-occ').value     = shift.occ != null ? shift.occ : '';
-  document.getElementById('esh-occType').value = shift.occType || 'Hotel';
-  document.getElementById('esh-notes').value   = shift.notes || '';
+  document.getElementById('esh-date').value      = shift.date || '';
+  document.getElementById('esh-startTime').value = _toInputTime(shift.startTime);
+  document.getElementById('esh-endTime').value   = _toInputTime(shift.endTime);
+  document.getElementById('esh-goal').value      = shift.goal || '';
+  document.getElementById('esh-occ').value       = shift.occ != null ? shift.occ : '';
+  document.getElementById('esh-occType').value   = shift.occType || 'Hotel';
+  document.getElementById('esh-notes').value     = shift.notes || '';
   _updateEshTypeButtons();
   document.getElementById('editShiftModal').style.display = 'flex';
 }
@@ -3769,6 +3706,8 @@ async function saveEditShift() {
   const occType   = document.getElementById('esh-occType').value;
   const notes     = document.getElementById('esh-notes').value.trim();
   const date      = document.getElementById('esh-date').value.trim();
+  const startTime = document.getElementById('esh-startTime').value || null;
+  const endTime   = document.getElementById('esh-endTime').value || null;
   // If hotel changed, recalculate sale commissions for new tier
   const shift = (historyCache || []).find(h => h.id === _editShiftId);
   let sales = shift?.sales || [];
@@ -3780,7 +3719,7 @@ async function saveEditShift() {
   }
   try {
     const result = await apiPut('/api/me/history/' + _editShiftId,
-      { hotel: hotel || null, hotelTier, goal, occ, occType, notes, date, shiftType: _eshShiftType, sales });
+      { hotel: hotel || null, hotelTier, goal, occ, occType, notes, date, startTime, endTime, shiftType: _eshShiftType, sales });
     if (!result) { btn.disabled = false; btn.textContent = 'Save changes'; return; }
     historyCache = null;
     closeEditShiftModal();
@@ -4137,6 +4076,16 @@ if (isIOS && !isStandalone) {
     <div class="input-group">
       <label>Date</label>
       <input type="text" id="esh-date" placeholder="e.g. Mon, Jun 23, 2026" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <div class="input-group" style="flex:1">
+        <label>Start time</label>
+        <input type="time" id="esh-startTime" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box">
+      </div>
+      <div class="input-group" style="flex:1">
+        <label>End time</label>
+        <input type="time" id="esh-endTime" style="width:100%;font-size:14px;padding:9px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;box-sizing:border-box">
+      </div>
     </div>
     <div class="input-group" style="margin-top:10px">
       <label>Hotel</label>
