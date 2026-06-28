@@ -450,6 +450,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .lb-total { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
 .lb-detail { font-size: 11px; color: var(--text2); margin-top: 1px; }
 
+/* ── Chat ─────────────────────────────────────────────────── */
+.chat-msgs { height:55vh; min-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:4px 0 8px; scroll-behavior:smooth; }
+.chat-msg-row { display:flex; gap:8px; align-items:flex-end; max-width:88%; }
+.chat-msg-row.mine { align-self:flex-end; flex-direction:row-reverse; }
+.chat-avatar-sm { width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; }
+.chat-bubble { border-radius:14px 14px 14px 3px; padding:8px 12px; font-size:13px; line-height:1.5; word-break:break-word; background:var(--bg2); color:var(--text); }
+.chat-msg-row.mine .chat-bubble { border-radius:14px 14px 3px 14px; background:var(--blue-mid); color:#fff; }
+.chat-meta { font-size:10px; color:var(--text3); margin-bottom:3px; }
+.chat-msg-row.mine .chat-meta { text-align:right; }
+.chat-input-row { display:flex; gap:8px; padding-top:10px; border-top:0.5px solid var(--border); margin-top:4px; }
+.chat-input { flex:1; font-size:14px; padding:10px 12px; border-radius:var(--radius); border:1px solid var(--border2); background:var(--bg); color:var(--text); font-family:inherit; }
+.chat-input:focus { outline:none; border-color:var(--blue-mid); }
+.chat-day-sep { text-align:center; font-size:11px; color:var(--text3); margin:4px 0; }
+
 /* ── Admin ────────────────────────────────────────────────── */
 .admin-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; padding: 2px 7px; border-radius: 99px; background: #F59E0B; color: #fff; vertical-align: middle; margin-left: 4px; }
 .admin-user-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--border); }
@@ -702,6 +716,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <button class="tab"        id="tab-btn-history"     onclick="switchTab('history',this)">This shift</button>
       <button class="tab"        id="tab-btn-past"        onclick="switchTab('past',this)">Past shifts</button>
       <button class="tab"        id="tab-btn-leaderboard" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
+      <button class="tab"        id="tab-btn-chat"        onclick="switchTab('chat',this)">💬 Chat</button>
       <button class="tab"        id="tab-btn-setup"       onclick="switchTab('setup',this)">Setup</button>
     </div>
   </div>
@@ -950,6 +965,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     </div>
   </div>
 
+  <!-- CHAT -->
+  <div class="tab-panel" id="tab-chat">
+    <div class="card" style="display:flex;flex-direction:column">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-title" style="margin:0">Team Chat</div>
+        <span style="font-size:11px;color:var(--text3)" id="chatOnlineLabel"></span>
+      </div>
+      <div class="chat-msgs" id="chatMsgs">
+        <div class="empty-state" style="border:none;padding:1rem 0;align-self:center">Loading…</div>
+      </div>
+      <div class="chat-input-row">
+        <input class="chat-input" id="chatInput" type="text" placeholder="Message your team…" maxlength="500"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}">
+        <button class="btn btn-primary" onclick="sendChat()" style="padding:0 16px;flex-shrink:0">Send</button>
+      </div>
+    </div>
+  </div>
+
   <!-- SETUP -->
   <div class="tab-panel" id="tab-setup">
     <div class="card">
@@ -1124,6 +1157,7 @@ const PRODUCT_CATEGORIES = [
     subgroups: [
       { label: '3-Day', products: ['3D BASE USF/IOA/EPIC AD', '3D BASE USF/IOA/EPIC CH', '3D PTP USF/IOA/EPIC AD', '3D PTP USF/IOA/EPIC CH'] },
       { label: '4–7 Day PTP', products: ['4D PTP USF/IOA/EPIC AD', '4D PTP USF/IOA/EPIC CH', '5D PTP USF/IOA/EPIC AD', '5D PTP USF/IOA/EPIC CH', '6D PTP USF/IOA/EPIC AD', '6D PTP USF/IOA/EPIC CH', '7D PTP USF/IOA/EPIC AD', '7D PTP USF/IOA/EPIC CH'] },
+      { label: '+ Volcano Bay', products: ['3D PTP USF/IOA/EPIC/VB AD', '3D PTP USF/IOA/EPIC/VB CH', '4D PTP USF/IOA/EPIC/VB AD', '4D PTP USF/IOA/EPIC/VB CH', '5D PTP USF/IOA/EPIC/VB AD', '5D PTP USF/IOA/EPIC/VB CH', '6D PTP USF/IOA/EPIC/VB AD', '6D PTP USF/IOA/EPIC/VB CH', '7D PTP USF/IOA/EPIC/VB AD', '7D PTP USF/IOA/EPIC/VB CH'] },
       { label: '+2 Day Free', products: ['3D BASE + 2 DAY FREE AD', '3D BASE + 2 DAY FREE CH', '3D PTP + 2 DAY FREE AD', '3D PTP + 2 DAY FREE CH', '3D BASE + 2 DAY FREE + VB AD', '3D BASE + 2 DAY FREE + VB CH'] }
     ],
     get products() { return this.subgroups.flatMap(s => s.products); }
@@ -1138,10 +1172,14 @@ const PRODUCT_CATEGORIES = [
   },
   { name: 'Annual Passes', color: '#D97706', icon: 'ti-ticket',
     subgroups: [
-      { label: 'Seasonal', products: ['2PK 12M SEASONAL FL AD', '2PK 12M SEASONAL FL CH', '2PK 12M SEASONAL AD', '2PK 12M SEASONAL CH'] },
-      { label: 'Power', products: ['2PK 12M POWER FL AD', '2PK 12M POWER FL CH', '2PK 12M POWER AD', '2PK 12M POWER CH'] },
-      { label: 'Preferred', products: ['2PK 12M PREFERRED FL AD', '2PK 12M PREFERRED FL CH', '2PK 12M PREFERRED AD', '2PK 12M PREFERRED CH'] },
-      { label: 'Premier', products: ['2PK 12M PREMIER FL AD', '2PK 12M PREMIER FL CH', '2PK 12M PREMIER AD', '2PK 12M PREMIER CH'] }
+      { label: '2-Park Seasonal', products: ['2PK 12M SEASONAL FL AD', '2PK 12M SEASONAL FL CH', '2PK 12M SEASONAL AD', '2PK 12M SEASONAL CH'] },
+      { label: '2-Park Power', products: ['2PK 12M POWER FL AD', '2PK 12M POWER FL CH', '2PK 12M POWER AD', '2PK 12M POWER CH'] },
+      { label: '2-Park Preferred', products: ['2PK 12M PREFERRED FL AD', '2PK 12M PREFERRED FL CH', '2PK 12M PREFERRED AD', '2PK 12M PREFERRED CH'] },
+      { label: '2-Park Premier', products: ['2PK 12M PREMIER FL AD', '2PK 12M PREMIER FL CH', '2PK 12M PREMIER AD', '2PK 12M PREMIER CH'] },
+      { label: '3-Park Seasonal', products: ['3PK 12M SEASONAL FL AD', '3PK 12M SEASONAL FL CH', '3PK 12M SEASONAL AD', '3PK 12M SEASONAL CH'] },
+      { label: '3-Park Power', products: ['3PK 12M POWER FL AD', '3PK 12M POWER FL CH', '3PK 12M POWER AD', '3PK 12M POWER CH'] },
+      { label: '3-Park Preferred', products: ['3PK 12M PREFERRED FL AD', '3PK 12M PREFERRED FL CH', '3PK 12M PREFERRED AD', '3PK 12M PREFERRED CH'] },
+      { label: '3-Park Premier', products: ['3PK 12M PREMIER FL AD', '3PK 12M PREMIER FL CH', '3PK 12M PREMIER AD', '3PK 12M PREMIER CH'] }
     ],
     get products() { return this.subgroups.flatMap(s => s.products); }
   },
@@ -1216,6 +1254,16 @@ const PRODUCT_PRICES = {
   // Annual Passes — Premier
   '2PK 12M PREMIER FL AD': 841.32, '2PK 12M PREMIER FL CH': 841.34,
   '2PK 12M PREMIER AD': 963.82,    '2PK 12M PREMIER CH': 963.82,
+  // 3-Park Annual Passes — FL Resident
+  '3PK 12M SEASONAL FL AD': 374.99,  '3PK 12M SEASONAL FL CH': 374.99,
+  '3PK 12M POWER FL AD': 434.99,     '3PK 12M POWER FL CH': 434.99,
+  '3PK 12M PREFERRED FL AD': 583.99, '3PK 12M PREFERRED FL CH': 583.99,
+  '3PK 12M PREMIER FL AD': 839.99,   '3PK 12M PREMIER FL CH': 839.99,
+  // 3-Park Annual Passes — Non-FL
+  '3PK 12M SEASONAL AD': 474.99,  '3PK 12M SEASONAL CH': 474.99,
+  '3PK 12M POWER AD': 534.99,     '3PK 12M POWER CH': 534.99,
+  '3PK 12M PREFERRED AD': 683.99, '3PK 12M PREFERRED CH': 683.99,
+  '3PK 12M PREMIER AD': 1014.99,  '3PK 12M PREMIER CH': 1014.99,
   // I-Ride
   '1D I-RIDE': 8.00, '3D I-RIDE': 10.00, '5D I-RIDE': 12.00,
   '7D I-RIDE': 18.00, '14D I-RIDE': 22.00,
@@ -1268,6 +1316,15 @@ function tierForHotel(name) {
 const CHART_COLORS  = ['#2563EB','#16A34A','#7C3AED','#D97706','#0D9488','#DC2626','#0284C7','#9333EA'];
 const EMOJIS        = ['😎','🏄','🎯','💪','⭐','🌟','🔥','💼','🎪','🏆','💎','🚀','👑','✨','🎭','🌊'];
 const COLORS        = ['#2563EB','#16A34A','#7C3AED','#EA580C','#DC2626','#DB2777','#0D9488','#D97706'];
+
+// Products sold at a fixed price with no tax applied
+const TAX_FREE_PRODUCTS = new Set(['1D I-RIDE','3D I-RIDE','5D I-RIDE','7D I-RIDE','14D I-RIDE']);
+function calcTax(product, amt, taxRate, inclTax) {
+  if (TAX_FREE_PRODUCTS.has(product)) return { preTax: amt, taxAmt: 0 };
+  const preTax = inclTax ? amt / (1 + taxRate / 100) : amt;
+  const taxAmt = inclTax ? amt - preTax : amt * taxRate / 100;
+  return { preTax, taxAmt };
+}
 
 // ─── Commission rates by tier (decimals) ─────────────────────
 const COMM_RATES = {
@@ -3075,8 +3132,7 @@ function psmUpdatePreview() {
   const amt = unitAmt*guests;
   const taxRate = state.taxRate??6.5;
   const inclTax = !psmPreTax;
-  const preTax = inclTax?amt/(1+taxRate/100):amt;
-  const taxAmt = inclTax?amt-preTax:amt*taxRate/100;
+  const { preTax, taxAmt } = calcTax(psmSelectedProduct, amt, taxRate, inclTax);
   const comm = calcCommission(psmSelectedProduct,preTax,tier);
   el.style.display='';
   document.getElementById('psmPreviewPre').textContent = fmtD(preTax)+(guests>1?' ('+guests+'×)':'');
@@ -3091,9 +3147,9 @@ function psmAddSale() {
   const tier = document.getElementById('psmTier').value;
   const taxRate = state.taxRate??6.5;
   const inclTax = !psmPreTax;
-  const preTax = inclTax?amt/(1+taxRate/100):amt;
-  const taxAmt = Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
-  const totalAmt = inclTax?amt:Math.round((amt+taxAmt)*100)/100;
+  const { preTax, taxAmt: taxAmtRaw2 } = calcTax(psmSelectedProduct, amt, taxRate, inclTax);
+  const taxAmt = Math.round(taxAmtRaw2 * 100) / 100;
+  const totalAmt = TAX_FREE_PRODUCTS.has(psmSelectedProduct) ? amt : (inclTax ? amt : Math.round((amt+taxAmt)*100)/100);
   const commission = calcCommission(psmSelectedProduct,preTax,tier);
   psmSales.push({product:psmSelectedProduct,amount:totalAmt,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note:'',time:nowStr(),ts:Date.now()});
   psmRenderSales();
@@ -3145,6 +3201,7 @@ function switchTab(id, el) {
   if (id==='past')        renderPastShifts();
   if (id==='leaderboard') { renderLeaderboard(); renderWeeklyComm(); renderHotelLeaderboard(); _insightsData=null; renderInsights(); }
   if (id==='setup')       renderTemplates();
+  if (id==='chat')        startChatPoll(); else stopChatPoll();
 }
 
 // ─── Sale actions ─────────────────────────────────────────────
@@ -3208,10 +3265,11 @@ async function logSale() {
   const taxRate=state.taxRate??6.5;
   // In past-edit mode use local toggle; otherwise use global setting
   const inclTax = pastEditShiftId!==null ? !pastEditPreTax : state.priceIncludesTax!==false;
-  const preTax=inclTax ? amt/(1+taxRate/100) : amt;
-  const taxAmt=Math.round((inclTax?amt-preTax:amt*taxRate/100)*100)/100;
+  const { preTax, taxAmt: taxAmtRaw } = calcTax(state.selectedProduct, amt, taxRate, inclTax);
+  const taxAmt = Math.round(taxAmtRaw * 100) / 100;
   const commission=calcCommission(state.selectedProduct,preTax,tier,_upgradeMode);
-  const sale={product:state.selectedProduct,amount:inclTax?amt:Math.round((amt+taxAmt)*100)/100,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now(),isUpgrade:_upgradeMode||undefined};
+  const totalAmt = TAX_FREE_PRODUCTS.has(state.selectedProduct) ? amt : (inclTax ? amt : Math.round((amt+taxAmt)*100)/100);
+  const sale={product:state.selectedProduct,amount:totalAmt,unitAmount:unitAmt,preTax:Math.round(preTax*100)/100,taxAmount:taxAmt,commission,guests,note,time:nowStr(),ts:Date.now(),isUpgrade:_upgradeMode||undefined};
 
   if (pastEditShiftId !== null) {
     // Add to local cart, don't submit yet
@@ -3274,12 +3332,11 @@ function updateSalePreview() {
   const taxRate=state.taxRate??6.5;
   // In past-edit mode, respect the local pre-tax toggle; otherwise use global setting
   const inclTax = pastEditShiftId!==null ? !pastEditPreTax : state.priceIncludesTax!==false;
-  const preTax=inclTax?amt/(1+taxRate/100):amt;
-  const taxAmt=inclTax?amt-preTax:amt*taxRate/100;
+  const { preTax, taxAmt } = calcTax(state.selectedProduct, amt, taxRate, inclTax);
   const commission=calcCommission(state.selectedProduct,preTax,tier,_upgradeMode);
   const rate=_upgradeMode ? (COMM_RATES.upgrades[tier]??0) : commRateFor(state.selectedProduct,tier);
   el.style.display='';
-  const unitPre=inclTax?unitAmt/(1+taxRate/100):unitAmt;
+  const unitPre = calcTax(state.selectedProduct, unitAmt, taxRate, inclTax).preTax;
   document.getElementById('previewPreTax').textContent=fmtD(preTax)+(guests>1?' ('+guests+'×'+fmtD(unitPre)+')':'');
   document.getElementById('previewTax').textContent=fmtD(Math.round(taxAmt*100)/100);
   document.getElementById('previewComm').textContent=fmtD(commission);
@@ -3490,6 +3547,82 @@ async function deleteAdminUser(id, name) {
     loadAdminPanel();
   } catch(e) {
     alert('Failed: ' + (e.message === '400' ? 'Cannot remove yourself.' : 'Server error.'));
+  }
+}
+
+// ─── Chat ────────────────────────────────────────────────────
+let _chatPoll = null;
+let _chatLastTs = 0;
+let _chatMsgs = [];
+
+function startChatPoll() {
+  if (_chatPoll) return;
+  _chatMsgs = []; _chatLastTs = 0;
+  loadChat();
+  _chatPoll = setInterval(loadChat, 4000);
+}
+function stopChatPoll() {
+  if (_chatPoll) { clearInterval(_chatPoll); _chatPoll = null; }
+}
+
+async function loadChat() {
+  try {
+    const msgs = await apiGet('/api/chat?since=' + _chatLastTs);
+    if (!msgs) return;
+    if (msgs.length) {
+      _chatMsgs = [..._chatMsgs, ...msgs];
+      _chatLastTs = Math.max(...msgs.map(m => m.ts));
+      renderChatMsgs();
+    } else if (!_chatMsgs.length) {
+      renderChatMsgs();
+    }
+  } catch {}
+}
+
+function renderChatMsgs() {
+  const el = document.getElementById('chatMsgs');
+  if (!el) return;
+  if (!_chatMsgs.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:2rem 0">No messages yet — say hello to the team! 👋</div>';
+    return;
+  }
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  let lastDay = '';
+  el.innerHTML = _chatMsgs.map(m => {
+    const mine = m.userId === currentUser?.id;
+    const time = new Date(m.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const day  = new Date(m.ts).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' });
+    let sep = '';
+    if (day !== lastDay) { sep = `<div class="chat-day-sep">${day}</div>`; lastDay = day; }
+    return sep + `<div class="chat-msg-row${mine?' mine':''}">
+      <div class="chat-avatar-sm" style="background:${m.userColor||'var(--blue-mid)'}">${m.userEmoji||'😊'}</div>
+      <div>
+        <div class="chat-meta">${mine ? 'You' : m.userName} · ${time}</div>
+        <div class="chat-bubble">${escChatHtml(m.text)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function escChatHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    .replace(/\n/g,'<br>');
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = (input.value || '').trim();
+  if (!text) return;
+  input.value = '';
+  try {
+    await apiPost('/api/chat', { text });
+    await loadChat();
+    const el = document.getElementById('chatMsgs');
+    if (el) el.scrollTop = el.scrollHeight;
+  } catch {
+    input.value = text;
+    alert('Failed to send message. Check your connection.');
   }
 }
 

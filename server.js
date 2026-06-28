@@ -538,6 +538,30 @@ app.post('/api/me/pin', auth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Chat ──────────────────────────────────────────────────
+const CHAT_FILE = path.join(DATA, 'chat.json');
+const MAX_CHAT  = 500;
+
+app.get('/api/chat', auth, (req, res) => {
+  const since = parseInt(req.query.since) || 0;
+  const msgs  = read(CHAT_FILE, []);
+  res.json(since ? msgs.filter(m => m.ts > since) : msgs.slice(-100));
+});
+
+app.post('/api/chat', auth, (req, res) => {
+  const text = (req.body.text || '').trim().slice(0, 500);
+  if (!text) return res.status(400).json({ error: 'Empty message' });
+  const users = read(path.join(DATA, 'users.json'), []);
+  const user  = users.find(u => u.id === req.uid);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const msgs = read(CHAT_FILE, []);
+  const msg  = { id: Date.now(), userId: req.uid, userName: user.name, userEmoji: user.emoji, userColor: user.color, text, ts: Date.now() };
+  msgs.push(msg);
+  if (msgs.length > MAX_CHAT) msgs.splice(0, msgs.length - MAX_CHAT);
+  write(CHAT_FILE, msgs);
+  res.json({ ok: true, msg });
+});
+
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
