@@ -2482,7 +2482,7 @@ async function renderCalendar() {
     const barColor = allZero ? '#64748b' : anyGoalHit ? '#34d399' : '#60a5fa';
     const amtStr   = dayTotal >= 1000 ? '$'+(dayTotal/1000).toFixed(1)+'k' : dayTotal > 0 ? '$'+Math.round(dayTotal) : shifts.length ? '$0' : '';
     const offDots  = offReqs.length ? `<div class="cal-day-off-dots">${offReqs.map(r=>`<span class="cal-day-off-dot" title="${r.userName} day off">${r.userEmoji||'🏖'}</span>`).join('')}</div>` : '';
-    html += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" onclick="calSelectDay('${dateStr}')">
+    html += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" data-date="${dateStr}" onclick="calSelectDay('${dateStr}')">
       <span class="cal-day-num" style="color:${isToday?'#fff':shifts.length?'var(--text)':'var(--text3)'}">${d}</span>
       ${shifts.length ? `<span class="cal-day-amt" style="color:${isToday?'#fff':barColor}">${amtStr}</span><div class="cal-day-bar" style="background:${barColor}"></div>` : ''}
       ${shifts.length > 1 ? `<span style="font-size:9px;color:${isToday?'rgba(255,255,255,.7)':'var(--text3)'}">${shifts.length} shifts</span>` : ''}
@@ -2495,14 +2495,14 @@ async function renderCalendar() {
     html += `<div class="cal-day other-month"><span class="cal-day-num">${i}</span></div>`;
 
   grid.innerHTML = html;
-  if (_calSelected) calSelectDay(_calSelected, true);
 }
 
 async function calSelectDay(dateStr, noToggle) {
   if (!noToggle && _calSelected === dateStr) {
     _calSelected = null;
     document.getElementById('calDayDetail').innerHTML = '';
-    renderCalendar(); return;
+    document.querySelectorAll('#calGrid .cal-day[data-date]').forEach(el => el.classList.remove('selected'));
+    return;
   }
   _calSelected = dateStr;
   const [history, timeOff] = await Promise.all([getHistory(), getTimeOff()]);
@@ -2561,7 +2561,8 @@ async function calSelectDay(dateStr, noToggle) {
 
   html += '</div>';
   detail.innerHTML = html;
-  renderCalendar();
+  document.querySelectorAll('#calGrid .cal-day[data-date]').forEach(el =>
+    el.classList.toggle('selected', el.dataset.date === _calSelected));
 }
 
 async function submitTimeOff(dateStr) {
