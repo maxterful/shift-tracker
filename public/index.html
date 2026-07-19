@@ -660,6 +660,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div class="metric-label">Commission</div>
       <div class="metric-value" id="totalCommission">$0.00</div>
       <div class="metric-sub" id="commSub"></div>
+      <div id="commBreakdown" style="font-size:10px;color:var(--text3);margin-top:3px;line-height:1.7"></div>
+      <div id="commGoalHint" style="display:none;font-size:10px;margin-top:4px;color:var(--amber-mid);font-weight:600"></div>
     </div>
     <div class="metric-card mc-green" id="goalCard">
       <div class="metric-label">vs. goal</div>
@@ -891,6 +893,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       </div>
       <div class="section-title" style="margin-top:14px;margin-bottom:10px">Personal records</div>
       <div id="personalRecords" style="font-size:13px;color:var(--text2)">—</div>
+      <div class="section-title" style="margin-top:14px;margin-bottom:10px">Best hotels for you <span style="font-size:11px;font-weight:400;color:var(--text3)">(avg sales per shift)</span></div>
+      <div id="hotelPerf" style="font-size:13px;color:var(--text2)"></div>
+      <div class="section-title" style="margin-top:14px;margin-bottom:10px">Sales by hotel occupancy <span style="font-size:11px;font-weight:400;color:var(--text3)">(avg per shift)</span></div>
+      <div id="occCorr"></div>
       <div class="section-title" style="margin-top:14px;margin-bottom:10px">Recent shifts</div>
       <div style="position:relative;height:120px"><canvas id="trendChart"></canvas></div>
       <div class="section-title" style="margin-top:14px;margin-bottom:10px">Sales by day of week <span style="font-size:11px;font-weight:400;color:var(--text3)">(avg per shift)</span></div>
@@ -2060,6 +2066,34 @@ function render() {
   } else {
     document.getElementById('commSub').textContent = '';
   }
+  // Feature 3: commission breakdown by category
+  const COMM_TYPE_LABELS = { express:'Express', vipPrivate:'VIP Private', vipNonPrivate:'VIP Non-Priv', lanyards:'Lanyards', ancillary:'Ancillary', admission:'Admission', thirdParty:'3rd Party' };
+  const commByType = {};
+  sales.forEach(s => {
+    if (!s.commission) return;
+    const t = commTypeFor(s.product || '', hotelTier);
+    if (t === 'none') return;
+    commByType[t] = (commByType[t] || 0) + s.commission;
+  });
+  const bkParts = Object.entries(commByType).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${COMM_TYPE_LABELS[k]||k}: ${fmtD(v)}`);
+  document.getElementById('commBreakdown').textContent = bkParts.join(' · ');
+  // Feature 4: commission goal hint
+  const cgHintEl = document.getElementById('commGoalHint');
+  if (cg > 0 && totalComm < cg) {
+    const gap = cg - totalComm;
+    const bestEntry = [
+      ['VIP Tour', COMM_RATES.vipPrivate[hotelTier]],
+      ['Express', COMM_RATES.express[hotelTier]],
+      ['Lanyards', COMM_RATES.lanyards[hotelTier]],
+      ['Ancillary', COMM_RATES.ancillary[hotelTier]],
+      ['Admission', COMM_RATES.admission[hotelTier]],
+    ].filter(([,r])=>r>0).sort((a,b)=>b[1]-a[1])[0];
+    const hint = bestEntry ? `~$${Math.ceil(gap/bestEntry[1]).toLocaleString()} in ${bestEntry[0]}` : fmtD(gap)+' more needed';
+    cgHintEl.textContent = `${fmtD(gap)} to goal · ${hint}`;
+    cgHintEl.style.display = '';
+  } else {
+    cgHintEl.style.display = 'none';
+  }
   if (goalPct !== null) {
     document.getElementById('goalPct').textContent   = Math.round(goalPct)+'%';
     document.getElementById('goalBar').style.width   = Math.min(goalPct,100)+'%';
@@ -2359,6 +2393,48 @@ async function renderPastShifts() {
 
   // Cache personal best for pace chip
   _personalBest = bestShift;
+
+  // Feature 5: best hotels for you
+  const hotelMap = {};
+  history.forEach(h => {
+    if (!h.hotel || !h.totalSales) return;
+    if (!hotelMap[h.hotel]) hotelMap[h.hotel] = { total:0, count:0 };
+    hotelMap[h.hotel].total += h.totalSales;
+    hotelMap[h.hotel].count++;
+  });
+  const hotelRows = Object.entries(hotelMap)
+    .map(([name, v]) => ({ name, avg: v.total/v.count, count: v.count }))
+    .sort((a,b) => b.avg-a.avg).slice(0,5);
+  const hotelEl = document.getElementById('hotelPerf');
+  if (hotelEl) hotelEl.innerHTML = hotelRows.length
+    ? hotelRows.map((r,i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--border2);font-size:13px">
+        <span>${['🥇','🥈','🥉'][i]||'·'} ${r.name}</span>
+        <span><strong>${fmt(r.avg)}</strong><span style="color:var(--text3);font-size:11px"> avg · ${r.count} shift${r.count!==1?'s':''}</span></span>
+      </div>`).join('')
+    : '<div style="color:var(--text3);font-size:12px">Log shifts with a hotel selected to see your best spots.</div>';
+
+  // Feature 8: occupancy correlation
+  const OCC_BUCKETS = [['80–100%',80,101],['60–79%',60,80],['40–59%',40,60],['<40%',0,40]];
+  const occData = OCC_BUCKETS.map(([label,lo,hi]) => {
+    const hits = history.filter(h => h.occ!=null && h.occ>=lo && h.occ<hi && h.totalSales>0);
+    return { label, avg: hits.length ? hits.reduce((a,h)=>a+h.totalSales,0)/hits.length : 0, count: hits.length };
+  }).filter(r => r.count > 0);
+  const occEl = document.getElementById('occCorr');
+  if (occEl) {
+    if (occData.length < 2) {
+      occEl.innerHTML = '<div style="color:var(--text3);font-size:12px">Log at least 2 shifts with different occupancy levels to see patterns.</div>';
+    } else {
+      const maxAvg = Math.max(...occData.map(r=>r.avg));
+      occEl.innerHTML = occData.map(r => {
+        const pct = Math.round(r.avg/maxAvg*100);
+        return `<div class="dow-row">
+          <span class="dow-label" style="width:64px">${r.label}</span>
+          <div class="dow-bar-wrap"><div class="dow-bar-fill" style="width:${pct}%"></div></div>
+          <span class="dow-val">${fmt(r.avg)}</span>
+        </div>`;
+      }).join('');
+    }
+  }
 
   // Trend chart — last 10 shifts
   const recent10 = [...history].sort((a,b)=>(a.shiftEnd||0)-(b.shiftEnd||0)).slice(-10);
@@ -2851,6 +2927,39 @@ function showEndShiftModal(entry, elMin) {
     { v: goalPct!=null ? goalPct+'% of goal' : 'No goal set', l: goalPct!=null?fmt(entry.goal)+' goal':'—' },
   ].map(s=>`<div class="end-stat"><div class="end-stat-val">${s.v}</div><div class="end-stat-lbl">${s.l}</div></div>`).join('');
   document.getElementById('endShiftNotes').value = state.notes || '';
+
+  // Feature 6: highlights — PB banner, commission breakdown, commission goal
+  const hi = [];
+  // Personal best check
+  const prevBest = (historyCache||[]).reduce((a,h)=>Math.max(a,h.totalSales||0),0);
+  if (entry.totalSales > 0 && entry.totalSales >= prevBest && prevBest >= 0) {
+    hi.push(`<div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:8px 12px;font-size:13px;font-weight:700;color:var(--green-mid);text-align:center">🏆 New personal best!</div>`);
+  }
+  // Commission breakdown
+  const endCommByType = {};
+  const COMM_TL = { express:'Express', vipPrivate:'VIP Private', vipNonPrivate:'VIP Non-Priv', lanyards:'Lanyards', ancillary:'Ancillary', admission:'Admission', thirdParty:'3rd Party' };
+  entry.sales.forEach(s => {
+    if (!s.commission) return;
+    const t = commTypeFor(s.product||'', entry.hotelTier||'Premier');
+    if (t==='none') return;
+    endCommByType[t] = (endCommByType[t]||0) + s.commission;
+  });
+  const endBkParts = Object.entries(endCommByType).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span>${COMM_TL[k]||k}: <strong>${fmtD(v)}</strong></span>`);
+  if (endBkParts.length > 1) {
+    hi.push(`<div style="background:var(--bg2);border-radius:var(--radius);padding:8px 12px;font-size:12px;color:var(--text2);display:flex;flex-wrap:wrap;gap:8px">${endBkParts.join('')}</div>`);
+  }
+  // Commission goal status
+  const cg = state.commGoal || 0;
+  if (cg > 0) {
+    if (entry.totalCommission >= cg) {
+      hi.push(`<div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:8px 12px;font-size:13px;font-weight:700;color:var(--green-mid);text-align:center">🎯 Commission goal hit!</div>`);
+    } else {
+      const gap = cg - entry.totalCommission;
+      hi.push(`<div style="background:var(--bg2);border-radius:var(--radius);padding:8px 12px;font-size:12px;color:var(--text3);text-align:center">${fmtD(gap)} short of your ${fmtD(cg)} commission goal</div>`);
+    }
+  }
+  document.getElementById('endShiftHighlights').innerHTML = hi.length ? `<div style="display:flex;flex-direction:column;gap:6px">${hi.join('')}</div>` : '';
+
   document.getElementById('endShiftModal').style.display = 'flex';
 }
 async function confirmEndShift() {
@@ -4027,6 +4136,7 @@ if (isIOS && !isStandalone) {
   <div class="end-shift-inner">
     <div class="end-shift-title">Shift complete 🎉</div>
     <div class="end-stat-grid" id="endStatGrid"></div>
+    <div id="endShiftHighlights" style="margin:10px 0"></div>
     <div class="input-group" style="margin-bottom:16px">
       <label>Shift notes <span style="font-weight:400;color:var(--text3)">optional</span></label>
       <textarea id="endShiftNotes" rows="3" placeholder="Weather, team size, special events, anything worth remembering…" style="width:100%;font-size:13px;padding:10px 11px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit;resize:none"></textarea>
