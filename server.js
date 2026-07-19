@@ -24,7 +24,9 @@ function read(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 }
 function write(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+  const tmp = file + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, file);
 }
 function hashPin(pin) {
   return crypto.createHash('sha256').update('st-2024:' + pin).digest('hex');

@@ -855,10 +855,19 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm" id="calToggleBtn" onclick="toggleCalendarView()"><i class="ti ti-calendar" style="margin-right:4px"></i>Calendar</button>
           <button class="btn btn-sm btn-primary" onclick="openPastShiftModal()"><i class="ti ti-plus" style="margin-right:4px"></i>Log past shift</button>
+          <button class="btn btn-sm" onclick="exportAllHistoryCSV()" title="Download all shifts as CSV"><i class="ti ti-download" style="margin-right:4px"></i>Export CSV</button>
           <button class="btn btn-danger btn-sm" onclick="clearHistory()">Clear all</button>
         </div>
       </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="period-tab active" id="pf-all"   onclick="setPastFilter('all',this)">All time</button>
+        <button class="period-tab"        id="pf-month" onclick="setPastFilter('month',this)">This month</button>
+        <button class="period-tab"        id="pf-week"  onclick="setPastFilter('week',this)">This week</button>
+      </div>
       <div id="pastShiftsList"><div class="empty-state">No completed shifts yet</div></div>
+      <div id="pastLoadMore" style="display:none;text-align:center;margin-top:10px">
+        <button class="btn btn-sm" onclick="loadMorePastShifts()">Load more</button>
+      </div>
       <div id="calendarView" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <button class="btn btn-sm" onclick="calNav(-1)" style="font-size:16px;padding:0 10px">‹</button>
@@ -1365,6 +1374,7 @@ async function apiFetch(method, path, body) {
     clearTimeout(timer);
     if (res.status === 401) { serverOk = false; setSyncUI('offline', 'Session expired'); handleSessionExpiry(); return null; }
     if (!res.ok) throw new Error(res.status);
+    if (!serverOk) { serverOk = true; setSyncUI('live', 'Synced'); }
     return res.json();
   } catch(e) {
     clearTimeout(timer);
@@ -1473,6 +1483,7 @@ async function addToHistory(entry) {
   }
   historyCache.unshift(entry);
   lsSet(lsHistoryKey(), historyCache);
+  _clearLbCache();
 }
 async function removeFromHistory(serverId, idx) {
   if (serverId && serverOk) { try { await apiDelete('/api/me/history/' + serverId); } catch {} }
@@ -1714,7 +1725,7 @@ async function enterApp(freshLogin = false) {
   // Render local state and boot UI immediately — never block on server
   const local = lsGet(lsStateKey(), null);
   if (local) { state = { ...state, ...local }; syncUIToState(); }
-  if (!local) render(); else render();
+  render();
   buildHotelSelect();
   renderCategoryPills();
   renderTemplates();
@@ -1745,6 +1756,16 @@ async function enterApp(freshLogin = false) {
   fetchParkInfo();
   fetchAnnouncement();
 }
+
+// Auto-reconnect when browser comes back online
+window.addEventListener('online', async () => {
+  if (!authToken || serverOk) return;
+  try {
+    await apiGet('/api/me');          // triggers serverOk=true + setSyncUI in apiFetch
+    historyCache = null;
+    await getHistory();               // flushes any queued pending saves
+  } catch {}
+});
 
 // ── Park info + weather ──────────────────────────────────────
 async function fetchParkInfo() {
@@ -2227,52 +2248,83 @@ function renderCharts(sales) {
   }
 }
 
+let _pastFilter = 'all';
+let _pastPage   = 1;
+const PAST_PAGE = 20;
+
+function setPastFilter(period, btn) {
+  _pastFilter = period; _pastPage = 1;
+  document.querySelectorAll('#tab-past .period-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderPastShifts();
+}
+function loadMorePastShifts() { _pastPage++; renderPastShifts(); }
+
+function _shiftCardHTML(h, histIdx, bestShift) {
+  const gp = h.goal>0?Math.round((h.totalSales/h.goal)*100):null;
+  const timeStr = h.startTime ? `${h.startTime}${h.endTime?' – '+h.endTime:''}` : '';
+  const dots=[h.txCount+' sale'+(h.txCount!==1?'s':''),h.totalGuests+' guest'+(h.totalGuests!==1?'s':''),h.totalGuests>0?h.conv+'% conv':null,h.topProduct?'Top: '+h.topProduct:null].filter(Boolean).join(' · ');
+  const sid = h.id ?? 'null';
+  const isRecord = h.totalSales >= bestShift && bestShift > 0;
+  const salesRows = (h.sales||[]).map((s,si)=>`
+    <div class="shc-sale-row">
+      <span class="shc-sale-prod">${s.isUpgrade?'<span style="font-size:10px;font-weight:700;background:#7C3AED;color:#fff;padding:1px 5px;border-radius:99px;margin-right:4px">↑ UPG</span>':''}${s.product}</span>
+      <span style="font-size:11px;color:var(--text3)">${s.guests>1?s.guests+'× ':''}</span>
+      <span class="shc-sale-amt">${fmtD(s.amount)}</span>
+      ${s.commission!=null?`<span class="shc-sale-comm">+${fmtD(s.commission)}</span>`:''}
+      <button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEditSaleModal('${sid}',${si})" title="Edit sale">✏</button>
+      <button class="trash-btn" style="font-size:13px" onclick="deleteSaleFromShift('${sid}',${si})" title="Delete sale">✕</button>
+    </div>`).join('');
+  return `<div class="shift-history-card">
+    <div class="shc-header">
+      <div>
+        <div class="shc-date">${h.date}${h.shiftType?`<span style="font-size:10px;font-weight:700;background:var(--bg2);color:var(--text2);padding:2px 6px;border-radius:99px;margin-left:6px">${h.shiftType} Shift</span>`:''}${timeStr?`<span class="shc-time" style="margin-left:6px">${timeStr}</span>`:''}</div>
+        <div class="shc-duration">${h.duration?fmtDur(h.duration):''}${h.occ!=null?' · '+h.occ+'% '+h.occType:''}</div>
+        ${h.hotel?`<div class="shc-hotel">${h.hotel} · ${h.hotelTier||''}</div>`:''}
+      </div>
+      <div class="shc-actions">
+        <button class="btn btn-sm" onclick="enterPastEditMode(${sid},'${h.date}')" title="Add sale to this shift">+</button>
+        <button class="btn btn-sm" onclick="openEditShiftModal(${sid})" title="Edit shift">✏</button>
+        <button class="btn btn-sm" onclick='openExportModal(${JSON.stringify({name:currentUser?.name,emoji:currentUser?.emoji,date:h.date,totalSales:h.totalSales,goal:h.goal,txCount:h.txCount,totalGuests:h.totalGuests,hotel:h.hotel,duration:h.duration})})' title="Share card">↗</button>
+        <button class="btn btn-sm" onclick="exportHistoryCSV(${sid},${histIdx})">CSV</button>
+        <button class="trash-btn" onclick="deleteHistoryEntry(${sid},${histIdx})" title="Delete shift">✕</button>
+      </div>
+    </div>
+    <div><span class="shc-total">${fmt(h.totalSales)}</span>${isRecord?'<span class="record-badge">PB</span>':''}${gp!==null?`<span class="shc-goal${gp<80?' miss':''}">${gp}% of ${fmt(h.goal)}</span>`:''}</div>
+    <div class="shc-stats">${dots}</div>
+    ${h.totalCommission?`<div class="shc-stats" style="color:var(--green-mid);font-weight:600">Commission: ${fmtD(h.totalCommission)}</div>`:''}
+    ${h.notes?`<div class="shc-notes">${h.notes}</div>`:''}
+    ${(h.sales||[]).length?`<button class="btn btn-sm" style="margin-top:8px;font-size:11px" onclick="toggleShiftSales('${sid}')">≡ ${h.sales.length} sales</button>
+    <div class="shc-sales-list" id="shcSales_${sid}">${salesRows}</div>`:''}
+  </div>`;
+}
+
 async function renderPastShifts() {
   const el = document.getElementById('pastShiftsList');
   const sc = document.getElementById('pastStatsCard');
   el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
   const history = await getHistory();
-  if (!history.length) { el.innerHTML='<div class="empty-state">No completed shifts yet.<br>End a shift to save it here.</div>'; sc.style.display='none'; return; }
+  if (!history.length) { el.innerHTML='<div class="empty-state">No completed shifts yet.<br>End a shift to save it here.</div>'; sc.style.display='none'; document.getElementById('pastLoadMore').style.display='none'; return; }
   sc.style.display='';
+
+  // Filter list by period
+  const now = new Date();
+  const filtered = history.filter(h => {
+    if (_pastFilter === 'all') return true;
+    if (!h.shiftStart) return false;
+    const d = new Date(h.shiftStart);
+    if (_pastFilter === 'week') { const w = new Date(now); w.setDate(now.getDate()-7); return d >= w; }
+    if (_pastFilter === 'month') return d.getMonth()===now.getMonth() && d.getFullYear()===now.getFullYear();
+    return true;
+  });
+
+  const pageItems = filtered.slice(0, _pastPage * PAST_PAGE);
+  document.getElementById('pastLoadMore').style.display = filtered.length > pageItems.length ? '' : 'none';
+
   const bestShift = history.reduce((a,h)=>Math.max(a,h.totalSales),0);
-  el.innerHTML = history.map((h,i) => {
-    const gp = h.goal>0?Math.round((h.totalSales/h.goal)*100):null;
-    const timeStr = h.startTime ? `${h.startTime}${h.endTime?' – '+h.endTime:''}` : '';
-    const dots=[h.txCount+' sale'+(h.txCount!==1?'s':''),h.totalGuests+' guest'+(h.totalGuests!==1?'s':''),h.totalGuests>0?h.conv+'% conv':null,h.topProduct?'Top: '+h.topProduct:null].filter(Boolean).join(' · ');
-    const sid = h.id ?? 'null';
-    const isRecord = h.totalSales >= bestShift && bestShift > 0;
-    const salesRows = (h.sales||[]).map((s,si)=>`
-      <div class="shc-sale-row">
-        <span class="shc-sale-prod">${s.isUpgrade?'<span style="font-size:10px;font-weight:700;background:#7C3AED;color:#fff;padding:1px 5px;border-radius:99px;margin-right:4px">↑ UPG</span>':''}${s.product}</span>
-        <span style="font-size:11px;color:var(--text3)">${s.guests>1?s.guests+'× ':''}</span>
-        <span class="shc-sale-amt">${fmtD(s.amount)}</span>
-        ${s.commission!=null?`<span class="shc-sale-comm">+${fmtD(s.commission)}</span>`:''}
-        <button class="btn btn-sm" style="padding:2px 7px;font-size:11px" onclick="openEditSaleModal('${sid}',${si})" title="Edit sale">✏</button>
-        <button class="trash-btn" style="font-size:13px" onclick="deleteSaleFromShift('${sid}',${si})" title="Delete sale">✕</button>
-      </div>`).join('');
-    return `<div class="shift-history-card">
-      <div class="shc-header">
-        <div>
-          <div class="shc-date">${h.date}${h.shiftType?`<span style="font-size:10px;font-weight:700;background:var(--bg2);color:var(--text2);padding:2px 6px;border-radius:99px;margin-left:6px">${h.shiftType} Shift</span>`:''}${timeStr?`<span class="shc-time" style="margin-left:6px">${timeStr}</span>`:''}</div>
-          <div class="shc-duration">${h.duration?fmtDur(h.duration):''}${h.occ!=null?' · '+h.occ+'% '+h.occType:''}</div>
-          ${h.hotel?`<div class="shc-hotel">${h.hotel} · ${h.hotelTier||''}</div>`:''}
-        </div>
-        <div class="shc-actions">
-          <button class="btn btn-sm" onclick="enterPastEditMode(${sid},'${h.date}')" title="Add sale to this shift">+</button>
-          <button class="btn btn-sm" onclick="openEditShiftModal(${sid})" title="Edit shift">✏</button>
-          <button class="btn btn-sm" onclick='openExportModal(${JSON.stringify({name:currentUser?.name,emoji:currentUser?.emoji,date:h.date,totalSales:h.totalSales,goal:h.goal,txCount:h.txCount,totalGuests:h.totalGuests,hotel:h.hotel,duration:h.duration})})' title="Share card">↗</button>
-          <button class="btn btn-sm" onclick="exportHistoryCSV(${sid},${i})">CSV</button>
-          <button class="trash-btn" onclick="deleteHistoryEntry(${sid},${i})" title="Delete shift">✕</button>
-        </div>
-      </div>
-      <div><span class="shc-total">${fmt(h.totalSales)}</span>${isRecord?'<span class="record-badge">PB</span>':''}${gp!==null?`<span class="shc-goal${gp<80?' miss':''}">${gp}% of ${fmt(h.goal)}</span>`:''}</div>
-      <div class="shc-stats">${dots}</div>
-      ${h.totalCommission?`<div class="shc-stats" style="color:var(--green-mid);font-weight:600">Commission: ${fmtD(h.totalCommission)}</div>`:''}
-      ${h.notes?`<div class="shc-notes">${h.notes}</div>`:''}
-      ${(h.sales||[]).length?`<button class="btn btn-sm" style="margin-top:8px;font-size:11px" onclick="toggleShiftSales('${sid}')">≡ ${h.sales.length} sales</button>
-      <div class="shc-sales-list" id="shcSales_${sid}">${salesRows}</div>`:''}
-    </div>`;
-  }).join('');
+  el.innerHTML = pageItems.length
+    ? pageItems.map(h => _shiftCardHTML(h, history.indexOf(h), bestShift)).join('')
+    : '<div class="empty-state">No shifts in this period.</div>';
   const agg=history.reduce((a,h)=>({total:a.total+h.totalSales,tx:a.tx+h.txCount,g:a.g+h.totalGuests,comm:a.comm+(h.totalCommission||0)}),{total:0,tx:0,g:0,comm:0});
   document.getElementById('pastStatShifts').textContent=history.length;
   document.getElementById('pastStatTotal').textContent=fmt(agg.total);
@@ -2492,12 +2544,23 @@ function calNav(dir) {
 
 // ─── Leaderboard ─────────────────────────────────────────────
 let lbPeriod = 'today';
+const _lbCache = {};
+const LB_TTL = 30000; // 30 s
+function _clearLbCache() { for (const k in _lbCache) delete _lbCache[k]; }
+async function _cachedLeaderboard(period) {
+  const key = period + '_' + new Date().getTimezoneOffset();
+  const now = Date.now();
+  if (_lbCache[key] && now - _lbCache[key].ts < LB_TTL) return _lbCache[key].data;
+  const data = await apiGet('/api/leaderboard?period=' + period + '&tz=' + new Date().getTimezoneOffset());
+  _lbCache[key] = { data, ts: now };
+  return data;
+}
 
 async function renderLeaderboard() {
   const el = document.getElementById('leaderboardList');
   el.innerHTML = '<div class="empty-state" style="border:none;padding:0.5rem 0;color:var(--text3)">Loading…</div>';
   try {
-    const raw = await apiGet('/api/leaderboard?period=' + lbPeriod + '&tz=' + new Date().getTimezoneOffset());
+    const raw = await _cachedLeaderboard(lbPeriod);
     const all = raw || [];
     // Always include self; others only if they have shifts
     const board = all.filter(r => r.shiftCount > 0 || r.user.id === currentUser?.id);
@@ -2557,7 +2620,7 @@ async function renderWeeklyComm() {
   const projTitle  = document.getElementById('monthlyProjTitle');
   const projSub    = document.getElementById('monthlyProjSub');
   try {
-    const board = await apiGet('/api/leaderboard?period=' + _commPeriod + '&tz=' + new Date().getTimezoneOffset());
+    const board = await _cachedLeaderboard(_commPeriod);
     const sorted = [...(board || [])].sort((a,b) => b.totalCommission - a.totalCommission).filter(r => r.totalCommission > 0);
 
     // Show/hide monthly projection for current user
@@ -3390,6 +3453,21 @@ function triggerCSV(rows,name) {
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.map(r=>r.join(',')).join('\n'));
   a.download=name+'.csv'; a.click();
+}
+async function exportAllHistoryCSV() {
+  const history = await getHistory();
+  if (!history.length) { alert('No shifts to export.'); return; }
+  const rows = [['Date','Hotel','Shift Type','Start','End','Total Sales','Goal','Commission','Tickets','Guests','Notes']];
+  history.forEach(h => {
+    rows.push([
+      '"'+(h.date||'')+'"', '"'+(h.hotel||'')+'"', h.shiftType||'',
+      h.startTime||'', h.endTime||'',
+      (h.totalSales||0).toFixed(2), (h.goal||0).toFixed(2),
+      (h.totalCommission||0).toFixed(2), h.txCount||0, h.totalGuests||0,
+      '"'+(h.notes||'')+'"'
+    ]);
+  });
+  triggerCSV(rows, (currentUser?.name||'shifts')+'-all-'+new Date().toISOString().slice(0,10));
 }
 
 // ─── Admin ────────────────────────────────────────────────────
