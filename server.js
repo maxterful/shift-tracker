@@ -596,6 +596,61 @@ app.post('/api/chat', auth, (req, res) => {
   res.json({ ok: true, msg });
 });
 
+// ── Receipt scanner ────────────────────────────────────────
+app.post('/api/scan-receipt', auth, express.json({ limit: '12mb' }), async (req, res) => {
+  const { image, mimeType } = req.body || {};
+  if (!image || !mimeType) return res.status(400).json({ error: 'image and mimeType required' });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'Receipt scanning not configured — add ANTHROPIC_API_KEY in Railway environment variables' });
+
+  const payload = JSON.stringify({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mimeType, data: image } },
+        { type: 'text', text: 'This is a Universal Orlando point-of-sale receipt. Extract each purchased line item. Return ONLY a JSON array, nothing else, no markdown. Each element: {"name": string, "qty": number, "unitPrice": number, "lineTotal": number}. Skip: tax lines, subtotals, grand totals, payment method lines, header/footer text. If qty is not shown assume 1. Prices as plain USD numbers (no $ sign).' }
+      ]
+    }]
+  });
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'api.anthropic.com',
+        path: '/v1/messages',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Length': Buffer.byteLength(payload)
+        }
+      };
+      const r = https.request(options, resp => {
+        let d = '';
+        resp.on('data', c => d += c);
+        resp.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+      });
+      r.on('error', reject);
+      r.write(payload);
+      r.end();
+    });
+
+    const text = result.content?.[0]?.text || '[]';
+    let items;
+    try {
+      const m = text.match(/\[[\s\S]*\]/);
+      items = m ? JSON.parse(m[0]) : [];
+    } catch { items = []; }
+    res.json({ items });
+  } catch (err) {
+    console.error('scan-receipt error:', err.message);
+    res.status(500).json({ error: 'Failed to parse receipt' });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {

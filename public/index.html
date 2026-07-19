@@ -721,12 +721,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
       <div id="pastEditCartItems"></div>
       <button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%" onclick="submitPastEditCart()">Save all to shift</button>
     </div>
+    <div id="bundlePanel" style="display:none;margin:0 0 8px"></div>
     <div id="recentProdsCard" style="display:none;margin-bottom:8px">
       <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">Recent</div>
       <div id="recentProdsBtns" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
     <div class="card" id="catCard">
-      <div class="section-title">Step 1 — Select category</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="section-title" style="margin:0">Step 1 — Select category</div>
+        <button class="btn btn-sm" onclick="openReceiptScanner()" title="Scan a receipt to auto-import sales"><i class="ti ti-camera" style="margin-right:4px"></i>Scan receipt</button>
+      </div>
       <div class="cat-pills" id="catPills"></div>
     </div>
     <div class="card" id="prodListCard" style="display:none">
@@ -780,9 +784,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <label>Note (optional)</label>
         <input type="text" id="saleNote" placeholder="e.g. honeymoon couple, asked about dining…">
       </div>
-      <button class="btn btn-primary" onclick="logSale()" style="width:100%;margin-top:6px">
-        <i class="ti ti-plus" style="margin-right:5px"></i>Log sale
-      </button>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn btn-primary" onclick="logSale()" style="flex:1">
+          <i class="ti ti-plus" style="margin-right:5px"></i>Log sale
+        </button>
+        <button class="btn" onclick="addToBundle()" style="flex:1" title="Add to bundle — log multiple items as one transaction">
+          <i class="ti ti-stack-2" style="margin-right:5px"></i>Add to bundle
+        </button>
+      </div>
       <button class="btn repeat-btn" id="repeatBtn" style="display:none" onclick="quickRepeat()">
         <i class="ti ti-refresh" style="margin-right:5px"></i><span id="repeatBtnLabel">Repeat last sale</span>
       </button>
@@ -3130,6 +3139,69 @@ function togglePsmTax() {
 }
 
 // ─── Inline past-edit cart ────────────────────────────────────
+let _bundleCart = [];
+
+function renderBundlePanel() {
+  const el = document.getElementById('bundlePanel');
+  if (!el) return;
+  if (!_bundleCart.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const total = _bundleCart.reduce((a,s) => a + s.amount, 0);
+  const comm  = _bundleCart.reduce((a,s) => a + (s.commission||0), 0);
+  el.innerHTML = `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 12px;font-size:12px">
+    <div style="font-weight:700;color:var(--text2);margin-bottom:6px">
+      Bundle · ${_bundleCart.length} item${_bundleCart.length!==1?'s':''} · ${fmtD(total)}${comm>0?' · +'+fmtD(comm)+' comm':''}
+    </div>
+    ${_bundleCart.map((s,i) => `<div style="display:flex;justify-content:space-between;padding:2px 0;color:var(--text2)">
+      <span>${s.isUpgrade?'↑ ':''}<b>${s.product}</b>${s.guests>1?' ×'+s.guests:''}${s.note?' <span style="color:var(--text3)">('+s.note+')</span>':''}</span>
+      <span style="white-space:nowrap">${fmtD(s.amount)}<button onclick="_bundleCart.splice(${i},1);renderBundlePanel()" style="background:none;border:none;color:var(--red-mid,#ef4444);cursor:pointer;font-size:11px;padding:0 0 0 6px">✕</button></span>
+    </div>`).join('')}
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn btn-primary btn-sm" style="flex:1" onclick="completeBundleSale()">Complete transaction · ${fmtD(total)}</button>
+      <button class="btn btn-sm" onclick="_bundleCart=[];renderBundlePanel()">Clear</button>
+    </div>
+  </div>`;
+}
+
+function addToBundle() {
+  if (!state.selectedProduct) { alert('Select a product first.'); return; }
+  const unitAmt = parseFloat(document.getElementById('saleAmount').value);
+  if (!unitAmt || unitAmt <= 0) { alert('Enter a valid sale amount.'); return; }
+  const guests = parseInt(document.getElementById('saleGuests').value) || 1;
+  const amt = Math.round(unitAmt * guests * 100) / 100;
+  const note = document.getElementById('saleNote').value.trim();
+  const tier = state.hotelTier || 'Premier';
+  const taxRate = state.taxRate ?? 6.5;
+  const inclTax = pastEditShiftId !== null ? !pastEditPreTax : state.priceIncludesTax !== false;
+  const { preTax, taxAmt: taxAmtRaw } = calcTax(state.selectedProduct, amt, taxRate, inclTax);
+  const taxAmt = Math.round(taxAmtRaw * 100) / 100;
+  const commission = calcCommission(state.selectedProduct, preTax, tier, _upgradeMode);
+  const totalAmt = TAX_FREE_PRODUCTS.has(state.selectedProduct) ? amt : (inclTax ? amt : Math.round((amt + taxAmt) * 100) / 100);
+  _bundleCart.push({ product: state.selectedProduct, amount: totalAmt, unitAmount: unitAmt, preTax: Math.round(preTax*100)/100, taxAmount: taxAmt, commission, guests, note, time: nowStr(), ts: Date.now(), isUpgrade: _upgradeMode || undefined });
+  renderBundlePanel();
+  document.getElementById('saleAmount').value = '';
+  document.getElementById('saleNote').value = '';
+  document.getElementById('saleGuests').value = '1';
+  document.getElementById('salePreview').style.display = 'none';
+  document.getElementById('priceEntryCard').style.display = 'none';
+  state.selectedProduct = null;
+  resetUpgradeMode();
+  renderCategoryPills();
+  renderProductListItems();
+}
+
+function completeBundleSale() {
+  if (!_bundleCart.length) return;
+  for (const s of _bundleCart) state.sales.push(s);
+  _lastSale = _bundleCart[_bundleCart.length - 1];
+  _bundleCart = [];
+  renderBundlePanel();
+  updateRepeatBtn();
+  state.updatedAt = Date.now();
+  render(); scheduleSave();
+  checkMilestones(state.sales.reduce((a,s) => a + s.amount, 0));
+}
+
 let pastEditCart = [];
 function renderPastEditCart() {
   const cart = pastEditCart;
@@ -3401,6 +3473,135 @@ async function exitPastEditMode() {
   clearCategorySelection();
   historyCache = null;
   switchTab('past', document.getElementById('tab-btn-past'));
+}
+
+// ─── Receipt scanner ────────────────────────────────────────
+let _scannedItems = []; // { name, qty, unitPrice, lineTotal, matchedProduct, confirmed }
+
+function _matchProductFromReceipt(name) {
+  const lower = name.toLowerCase();
+  const allProds = [];
+  PRODUCT_CATEGORIES.forEach(cat => {
+    cat.products.forEach(p => {
+      if (typeof p === 'string') allProds.push(p);
+      else if (p.items) p.items.forEach(item => allProds.push(item));
+      else if (p.name) allProds.push(p.name);
+    });
+  });
+  return allProds.find(p => {
+    const pl = p.toLowerCase();
+    return pl === lower || lower.includes(pl) || pl.includes(lower);
+  }) || null;
+}
+
+function openReceiptScanner() {
+  document.getElementById('receiptFileInput').click();
+}
+
+async function handleReceiptFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const dataUrl = reader.result;
+    const base64 = dataUrl.split(',')[1];
+    const mimeType = file.type || 'image/jpeg';
+    const loadingEl = document.getElementById('receiptScanItems');
+    const modal = document.getElementById('receiptScanModal');
+    modal.style.display = 'flex';
+    loadingEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3)">Scanning receipt…</div>';
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 30000);
+      let data;
+      try {
+        const resp = await fetch('/api/scan-receipt', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ image: base64, mimeType }), signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!resp.ok) { const e = await resp.json().catch(()=>({error:'Server error'})); throw new Error(e.error || resp.status); }
+        data = await resp.json();
+      } catch(fe) { clearTimeout(timer); throw fe; }
+      const items = (data.items || []).map(it => ({
+        ...it,
+        matchedProduct: _matchProductFromReceipt(it.name),
+        confirmed: true
+      }));
+      if (!items.length) {
+        loadingEl.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:16px">No items detected. Try a clearer photo.</div>';
+        return;
+      }
+      _scannedItems = items;
+      renderReceiptItems();
+    } catch (err) {
+      loadingEl.innerHTML = `<div style="color:var(--red-mid,#ef4444);font-size:13px;padding:12px">${err?.message || 'Scan failed. Check connection or receipt image.'}</div>`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderReceiptItems() {
+  const el = document.getElementById('receiptScanItems');
+  if (!_scannedItems.length) { el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px">No items.</div>'; return; }
+  const allProds = [];
+  PRODUCT_CATEGORIES.forEach(cat => {
+    cat.products.forEach(p => {
+      if (typeof p === 'string') allProds.push(p);
+      else if (p.items) p.items.forEach(i => allProds.push(i));
+      else if (p.name) allProds.push(p.name);
+    });
+  });
+  el.innerHTML = _scannedItems.map((it, idx) => `
+    <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px">
+      <input type="checkbox" id="scan-cb-${idx}" ${it.confirmed?'checked':''} onchange="_scannedItems[${idx}].confirmed=this.checked" style="margin-top:3px;cursor:pointer">
+      <div style="flex:1">
+        <div style="font-weight:600;color:var(--text)">${it.name}${it.qty>1?' ×'+it.qty:''}</div>
+        <select onchange="_scannedItems[${idx}].matchedProduct=this.value||null" style="margin-top:4px;width:100%;font-size:12px;padding:4px 6px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+          <option value="">— no match —</option>
+          ${allProds.map(p => `<option value="${p}" ${it.matchedProduct===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+      <div style="text-align:right;white-space:nowrap;font-weight:700;color:var(--text)">${fmtD(it.lineTotal||it.unitPrice||0)}</div>
+    </div>`).join('');
+}
+
+function closeReceiptModal() {
+  document.getElementById('receiptScanModal').style.display = 'none';
+  _scannedItems = [];
+}
+
+function importScannedItems(toBundle) {
+  const tier = state.hotelTier || 'Premier';
+  const taxRate = state.taxRate ?? 6.5;
+  const inclTax = state.priceIncludesTax !== false;
+  let added = 0;
+  for (const it of _scannedItems) {
+    if (!it.confirmed) continue;
+    const product = it.matchedProduct || 'Other';
+    const rawAmt = it.lineTotal || (it.unitPrice * (it.qty || 1)) || 0;
+    if (!rawAmt) continue;
+    const { preTax, taxAmt: taxAmtRaw } = calcTax(product, rawAmt, taxRate, inclTax);
+    const taxAmt = Math.round(taxAmtRaw * 100) / 100;
+    const commission = calcCommission(product, preTax, tier, false);
+    const totalAmt = TAX_FREE_PRODUCTS.has(product) ? rawAmt : (inclTax ? rawAmt : Math.round((rawAmt + taxAmt) * 100) / 100);
+    const sale = { product, amount: totalAmt, unitAmount: it.unitPrice||rawAmt, preTax: Math.round(preTax*100)/100, taxAmount: taxAmt, commission, guests: it.qty||1, note: it.name !== product ? it.name : '', time: nowStr(), ts: Date.now() };
+    if (toBundle) {
+      _bundleCart.push(sale);
+    } else {
+      state.sales.push(sale);
+      _lastSale = sale;
+    }
+    added++;
+  }
+  closeReceiptModal();
+  if (toBundle) {
+    renderBundlePanel();
+    if (added) alert(`${added} item${added!==1?'s':''} added to bundle. Tap "Complete transaction" to finalize.`);
+  } else if (added) {
+    updateRepeatBtn();
+    state.updatedAt = Date.now();
+    render(); scheduleSave();
+    checkMilestones(state.sales.reduce((a,s) => a + s.amount, 0));
+  }
 }
 
 async function logSale() {
@@ -4227,5 +4428,22 @@ if (isIOS && !isStandalone) {
     </div>
   </div>
 </div>
+
+<!-- Receipt scan modal -->
+<div class="past-shift-modal" id="receiptScanModal" onclick="if(event.target===this)closeReceiptModal()" style="display:none">
+  <div class="modal-content" style="max-width:440px;width:94%;background:var(--bg);border-radius:var(--radius-lg,12px);padding:20px;box-shadow:0 8px 32px rgba(0,0,0,.35)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:700;color:var(--text)">Scanned items</div>
+      <button onclick="closeReceiptModal()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    <div id="receiptScanItems" style="font-size:13px;max-height:380px;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-primary" style="flex:1" onclick="importScannedItems(false)">Add to sales</button>
+      <button class="btn" style="flex:1" onclick="importScannedItems(true)">Add to bundle</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="receiptFileInput" accept="image/*" capture="environment" style="display:none" onchange="handleReceiptFile(this)">
 </body>
 </html>
