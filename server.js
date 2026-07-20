@@ -608,7 +608,8 @@ app.post('/api/scan-receipt', auth, async (req, res) => {
     language: 'eng',
     OCREngine: '2',
     scale: 'true',
-    detectOrientation: 'true'
+    detectOrientation: 'true',
+    isTable: 'true'
   }).toString();
   try {
     const result = await new Promise((resolve, reject) => {
