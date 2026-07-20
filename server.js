@@ -597,12 +597,12 @@ app.post('/api/chat', auth, (req, res) => {
 });
 
 
-// ── Receipt scanner (Gemini Flash vision — free with AI Studio key) ────────
+// ── Receipt scanner (OpenRouter — free Gemini Flash vision) ────────────────
 app.post('/api/scan-receipt', auth, async (req, res) => {
   const { image, mimeType } = req.body || {};
   if (!image || !mimeType) return res.status(400).json({ error: 'image and mimeType required' });
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not set — add it in Railway environment variables' });
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'OPENROUTER_API_KEY not set — add it in Railway environment variables' });
 
   const prompt = `You are a receipt parser for a theme park ticket sales tracker.
 Extract all purchased product line items from this receipt image.
@@ -616,21 +616,27 @@ Rules:
 - Keep product names exactly as they appear on the receipt`;
 
   const body = JSON.stringify({
-    contents: [{ parts: [
-      { inline_data: { mime_type: mimeType, data: image } },
-      { text: prompt }
+    model: 'google/gemini-2.0-flash-exp:free',
+    messages: [{ role: 'user', content: [
+      { type: 'image_url', image_url: { url: `data:${mimeType};base64,${image}` } },
+      { type: 'text', text: prompt }
     ]}],
-    generationConfig: { temperature: 0 }
+    temperature: 0
   });
 
   try {
     const result = await new Promise((resolve, reject) => {
       const buf = Buffer.from(body);
       const r = https.request({
-        hostname: 'generativelanguage.googleapis.com',
-        path: `/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        hostname: 'openrouter.ai',
+        path: '/api/v1/chat/completions',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': buf.length }
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': buf.length,
+          'Authorization': `Bearer ${apiKey}`,
+          'X-Title': 'Shift Tracker'
+        }
       }, resp => {
         let d = ''; resp.on('data', c => d += c);
         resp.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
@@ -638,9 +644,9 @@ Rules:
       r.on('error', reject); r.write(buf); r.end();
     });
 
-    if (result.error) return res.status(502).json({ error: result.error.message || 'Gemini error' });
+    if (result.error) return res.status(502).json({ error: result.error.message || 'OpenRouter error' });
 
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = result.choices?.[0]?.message?.content || '';
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     if (!jsonMatch) return res.json({ items: [], rawText: text });
     let items;
