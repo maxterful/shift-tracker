@@ -51,7 +51,7 @@ setInterval(() => {
   for (const [ip, a] of loginAttempts) if (now > a.lockUntil && a.count === 0) loginAttempts.delete(ip);
 }, 60 * 60 * 1000);
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
 
 // ── Security headers ───────────────────────────────────────────
 app.use((req, res, next) => {
@@ -59,7 +59,7 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=()');
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
@@ -597,7 +597,7 @@ app.post('/api/chat', auth, (req, res) => {
 });
 
 // ── Receipt scanner (Google Gemini — free tier) ─────────────
-app.post('/api/scan-receipt', auth, express.json({ limit: '12mb' }), async (req, res) => {
+app.post('/api/scan-receipt', auth, async (req, res) => {
   const { image, mimeType } = req.body || {};
   if (!image || !mimeType) return res.status(400).json({ error: 'image and mimeType required' });
   const apiKey = process.env.GEMINI_API_KEY;
@@ -615,10 +615,10 @@ app.post('/api/scan-receipt', auth, express.json({ limit: '12mb' }), async (req,
 
   try {
     const result = await new Promise((resolve, reject) => {
-      const path = `/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const apiPath = `/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
       const options = {
         hostname: 'generativelanguage.googleapis.com',
-        path,
+        path: apiPath,
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
       };
@@ -632,6 +632,11 @@ app.post('/api/scan-receipt', auth, express.json({ limit: '12mb' }), async (req,
       r.end();
     });
 
+    if (result.error) {
+      console.error('Gemini API error:', result.error);
+      return res.status(502).json({ error: result.error.message || 'Gemini API error' });
+    }
+
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
     let items;
     try {
@@ -641,7 +646,7 @@ app.post('/api/scan-receipt', auth, express.json({ limit: '12mb' }), async (req,
     res.json({ items });
   } catch (err) {
     console.error('scan-receipt error:', err.message);
-    res.status(500).json({ error: 'Failed to parse receipt' });
+    res.status(500).json({ error: err.message || 'Failed to parse receipt' });
   }
 });
 
