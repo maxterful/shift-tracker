@@ -615,7 +615,7 @@ app.post('/api/scan-receipt', auth, async (req, res) => {
 
   try {
     const result = await new Promise((resolve, reject) => {
-      const apiPath = `/v1/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const apiPath = `/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
       const options = {
         hostname: 'generativelanguage.googleapis.com',
         path: apiPath,
