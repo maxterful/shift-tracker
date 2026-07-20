@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer crossorigin="anonymous"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -3553,27 +3554,26 @@ async function handleReceiptFile(input) {
     </div>`;
   };
 
-  setStatus('Loading OCR engine…');
+  setStatus('Waiting for OCR engine…');
   try {
+    // Wait for the deferred Tesseract script to be ready (up to 15s)
     if (!window.Tesseract) {
       await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error('Could not load OCR engine — check connection'));
-        document.head.appendChild(s);
+        let tries = 0;
+        const id = setInterval(() => {
+          if (window.Tesseract) { clearInterval(id); resolve(); }
+          else if (++tries > 30) { clearInterval(id); reject(new Error('OCR engine failed to load — try refreshing the page')); }
+        }, 500);
       });
     }
     setStatus('Preparing image…', 5);
     const resized = await _resizeForOCR(file, 1800);
     setStatus('Reading receipt… 0%', 5);
     const { data: { text } } = await Tesseract.recognize(resized, 'eng', {
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/worker.min.js',
-      langPath: 'https://tessdata.projectnaptha.com/4.0.0',
-      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@4/tesseract-core-simd.wasm.js',
       logger: m => {
         if (m.status === 'recognizing text') setStatus(`Reading receipt… ${Math.round(m.progress*100)}%`, 10 + Math.round(m.progress*88));
-        else if (m.status === 'loading language traineddata') setStatus('Downloading language data…', 8);
+        else if (m.status === 'loading language traineddata') setStatus('Downloading language data… (first time only)', 8);
+        else if (m.status === 'initializing api') setStatus('Initializing OCR…', 6);
       }
     });
     const items = _parseReceiptText(text).map(it => ({
