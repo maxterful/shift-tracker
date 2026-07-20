@@ -3520,6 +3520,24 @@ function _parseReceiptText(text) {
   return items;
 }
 
+function _resizeForOCR(file, maxPx) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => resolve(b || file), 'image/jpeg', 0.92);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 async function handleReceiptFile(input) {
   const file = input.files[0];
   if (!file) return;
@@ -3527,24 +3545,42 @@ async function handleReceiptFile(input) {
   const modal = document.getElementById('receiptScanModal');
   const loadingEl = document.getElementById('receiptScanItems');
   modal.style.display = 'flex';
-  loadingEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3)"><div>Loading OCR engine…</div><div style="font-size:11px;margin-top:4px">First scan downloads ~10 MB — subsequent scans are instant</div></div>';
+
+  const setStatus = (msg, pct) => {
+    loadingEl.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3)">
+      <div style="margin-bottom:8px">${msg}</div>
+      ${pct != null ? `<div style="background:var(--border);border-radius:99px;height:4px;overflow:hidden"><div style="background:var(--blue-mid,#2563eb);height:100%;width:${pct}%;transition:width .3s"></div></div>` : ''}
+    </div>`;
+  };
+
+  setStatus('Loading OCR engine…');
   try {
     if (!window.Tesseract) {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
         s.onload = resolve;
-        s.onerror = () => reject(new Error('Could not load OCR engine — check internet connection'));
+        s.onerror = () => reject(new Error('Could not load OCR engine — check connection'));
         document.head.appendChild(s);
       });
     }
-    loadingEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3)">Reading receipt…</div>';
-    const { data: { text } } = await Tesseract.recognize(file, 'eng');
+    setStatus('Preparing image…', 5);
+    const resized = await _resizeForOCR(file, 1800);
+    setStatus('Reading receipt… 0%', 5);
+    const { data: { text } } = await Tesseract.recognize(resized, 'eng', {
+      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/worker.min.js',
+      langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@4/tesseract-core-simd.wasm.js',
+      logger: m => {
+        if (m.status === 'recognizing text') setStatus(`Reading receipt… ${Math.round(m.progress*100)}%`, 10 + Math.round(m.progress*88));
+        else if (m.status === 'loading language traineddata') setStatus('Downloading language data…', 8);
+      }
+    });
     const items = _parseReceiptText(text).map(it => ({
       ...it, matchedProduct: _matchProductFromReceipt(it.name), confirmed: true
     }));
     if (!items.length) {
-      loadingEl.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:16px">No line items detected. Try a well-lit, straight-on photo of the receipt.</div>';
+      loadingEl.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No line items found.<br><span style="font-size:11px">Try a flat, well-lit photo straight on.</span></div>';
       return;
     }
     _scannedItems = items;
