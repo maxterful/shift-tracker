@@ -3645,14 +3645,23 @@ async function handleReceiptFile(input) {
       if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || 'Server error'); }
       data = await resp.json();
     } catch(fe) { clearTimeout(timer); throw fe; }
-    _rawOcrText = data.text || '';
-    const items = _parseReceiptText(_rawOcrText).map(it => ({
-      ...it, matchedProduct: _matchProductFromReceipt(it.name), confirmed: true
-    }));
+    let items;
+    if (Array.isArray(data.items)) {
+      // Gemini returned structured JSON — use directly
+      items = data.items.map(it => {
+        const qty = Math.max(1, parseInt(it.qty) || 1);
+        const lineTotal = parseFloat(it.amount) || 0;
+        return { name: String(it.name || '').trim(), qty, unitPrice: qty > 1 ? Math.round(lineTotal / qty * 100) / 100 : lineTotal, lineTotal, matchedProduct: _matchProductFromReceipt(String(it.name || '')), confirmed: true };
+      }).filter(it => it.name.length > 1 && it.lineTotal > 0);
+      _rawOcrText = data.rawText || '';
+    } else {
+      _rawOcrText = data.text || '';
+      items = _parseReceiptText(_rawOcrText).map(it => ({ ...it, matchedProduct: _matchProductFromReceipt(it.name), confirmed: true }));
+    }
     if (!items.length) {
       loadingEl.innerHTML = `<div style="text-align:center;padding:16px">
         <div style="color:var(--text3);font-size:13px;margin-bottom:10px">No line items found. Try a flat, well-lit photo straight on.</div>
-        ${_rawOcrText ? `<details style="text-align:left;font-size:11px;color:var(--text3)"><summary style="cursor:pointer;margin-bottom:4px">Show raw OCR text</summary><pre style="white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;background:var(--bg2);padding:8px;border-radius:var(--radius)">${_rawOcrText.replace(/</g,'&lt;')}</pre></details>` : ''}
+        ${_rawOcrText ? `<details style="text-align:left;font-size:11px;color:var(--text3)"><summary style="cursor:pointer;margin-bottom:4px">Show raw text</summary><pre style="white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;background:var(--bg2);padding:8px;border-radius:var(--radius)">${_rawOcrText.replace(/</g,'&lt;')}</pre></details>` : ''}
       </div>`;
       return;
     }

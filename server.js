@@ -597,34 +597,55 @@ app.post('/api/chat', auth, (req, res) => {
 });
 
 
-// ── Receipt scanner (OCR.space — free, no key needed) ────────
+// ── Receipt scanner (Gemini Flash vision — free with AI Studio key) ────────
 app.post('/api/scan-receipt', auth, async (req, res) => {
   const { image, mimeType } = req.body || {};
   if (!image || !mimeType) return res.status(400).json({ error: 'image and mimeType required' });
-  const apiKey = process.env.OCR_SPACE_KEY || 'helloworld';
-  const payload = new URLSearchParams({
-    apikey: apiKey,
-    base64Image: `data:${mimeType};base64,${image}`,
-    language: 'eng',
-    OCREngine: '2',
-    scale: 'true',
-    detectOrientation: 'true',
-    isTable: 'true'
-  }).toString();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'GEMINI_API_KEY not set — add it in Railway environment variables' });
+
+  const prompt = `You are a receipt parser for a theme park ticket sales tracker.
+Extract all purchased product line items from this receipt image.
+Return ONLY a raw JSON array — no markdown, no code fences, no explanation.
+Format: [{"qty":1,"name":"product name exactly as written","amount":9.99},...]
+Rules:
+- Include only product line items; skip subtotal, tax, total, change, cash, card, approval, tip, header rows
+- "amount" is the full line total for all units (qty × unit price), not the unit price
+- If the receipt shows pre-tax amounts with tax listed separately, use those pre-tax line amounts
+- "qty" defaults to 1 if not shown
+- Keep product names exactly as they appear on the receipt`;
+
+  const body = JSON.stringify({
+    contents: [{ parts: [
+      { inline_data: { mime_type: mimeType, data: image } },
+      { text: prompt }
+    ]}],
+    generationConfig: { temperature: 0 }
+  });
+
   try {
     const result = await new Promise((resolve, reject) => {
-      const buf = Buffer.from(payload);
+      const buf = Buffer.from(body);
       const r = https.request({
-        hostname: 'api.ocr.space', path: '/parse/image', method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': buf.length }
+        hostname: 'generativelanguage.googleapis.com',
+        path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': buf.length }
       }, resp => {
         let d = ''; resp.on('data', c => d += c);
         resp.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
       });
       r.on('error', reject); r.write(buf); r.end();
     });
-    if (result.IsErroredOnProcessing) return res.status(502).json({ error: result.ErrorMessage?.[0] || 'OCR failed' });
-    res.json({ text: result.ParsedResults?.[0]?.ParsedText || '' });
+
+    if (result.error) return res.status(502).json({ error: result.error.message || 'Gemini error' });
+
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return res.json({ items: [], rawText: text });
+    let items;
+    try { items = JSON.parse(jsonMatch[0]); } catch(e) { return res.json({ items: [], rawText: text }); }
+    res.json({ items });
   } catch (err) {
     console.error('scan-receipt:', err.message);
     res.status(500).json({ error: err.message || 'Failed to process receipt' });
