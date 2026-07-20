@@ -3477,21 +3477,80 @@ async function exitPastEditMode() {
 
 // ─── Receipt scanner ────────────────────────────────────────
 let _scannedItems = []; // { name, qty, unitPrice, lineTotal, matchedProduct, confirmed }
+let _rawOcrText = '';
+
+// Keyword rules: [keywords-that-must-all-appear, product-name]
+// Listed most-specific first; first match wins.
+const _RECEIPT_RULES = [
+  [['vip','private','2d'],        'VIP TOUR: PRIVATE PTP 2D'],
+  [['vip','private','epic'],      'VIP TOUR: PRIVATE EPIC'],
+  [['vip','private','ptp'],       'VIP TOUR: PRIVATE PTP'],
+  [['vip','private','ioa'],       'VIP TOUR: PRIVATE IOA'],
+  [['vip','private','usf'],       'VIP TOUR: PRIVATE USF'],
+  [['vip','non','epic'],          'VIP TOUR: NON-PRIVATE EPIC'],
+  [['vip','non','ptp'],           'VIP TOUR: NON-PRIVATE PTP'],
+  [['vip','non'],                 'VIP TOUR: NON-PRIVATE PTP'],
+  [['vip','private'],             'VIP TOUR: PRIVATE PTP'],
+  [['vip'],                       'VIP TOUR: PRIVATE PTP'],
+  [['express','unlimited','2d'],  '2D USF/IOA UNLIMITED EXPRESS'],
+  [['unlimited','express'],       'USF/IOA UNLIMITED EXPRESS'],
+  [['express','epic'],            'EPIC EXPRESS'],
+  [['express','vb'],              'VB EXPRESS'],
+  [['express','4pm'],             'USF EXPRESS >4PM'],
+  [['express','ioa'],             'IOA EXPRESS'],
+  [['express','usf'],             'USF EXPRESS'],
+  [['express'],                   'USF/IOA EXPRESS'],
+  [['epic','ptp','combo'],        '1D USF/IOA PTP + 1D EPIC AD'],
+  [['epic','base','combo'],       '1D USF/IOA BASE + 1D EPIC AD'],
+  [['epic'],                      'Epic Universe 1D AD'],
+  [['ptp','2d'],                  'USF/IOA 2D PTP AD'],
+  [['ptp','fl'],                  'FL USF/IOA 1D PTP AD'],
+  [['ptp'],                       'USF/IOA 1D PTP AD'],
+  [['park','park'],               'USF/IOA 1D PTP AD'],
+  [['base','2d'],                 'USF/IOA 2D Base AD'],
+  [['base','fl'],                 'FL USF/IOA 1D BASE AD'],
+  [['base'],                      'USF/IOA 1D Base AD'],
+  [['3pk','premier'],             '3PK 12M PREMIER AD'],
+  [['3pk','preferred'],           '3PK 12M PREFERRED AD'],
+  [['3pk','power'],               '3PK 12M POWER AD'],
+  [['3pk','seasonal'],            '3PK 12M SEASONAL AD'],
+  [['2pk','premier'],             '2PK 12M PREMIER AD'],
+  [['2pk','preferred'],           '2PK 12M PREFERRED AD'],
+  [['2pk','power'],               '2PK 12M POWER AD'],
+  [['2pk','seasonal'],            '2PK 12M SEASONAL AD'],
+  [['annual','premier'],          '2PK 12M PREMIER AD'],
+  [['annual','preferred'],        '2PK 12M PREFERRED AD'],
+  [['annual'],                    '2PK 12M POWER AD'],
+  [['volcano','bay'],             '1D VB AD'],
+  [['vb'],                        '1D VB AD'],
+  [['freestyle','cup'],           '1D FREESTYLE CUP'],
+  [['freestyle'],                 '1D FREESTYLE CUP'],
+  [['lanyard','potter'],          'POTTER LANYARD AND POUCH COMBO'],
+  [['lanyard'],                   'LANYARD AND POUCH COMBO'],
+  [['pouch'],                     'POUCH ONLY'],
+  [['photo'],                     '1D MY UNIVERSAL PHOTOS'],
+  [['cabana'],                    'CABANA - SINGLE'],
+  [['parking'],                   'PRE-PAID REGULAR PARKING'],
+  [['hhn','express'],             'HHN EXPRESS STANDARD'],
+  [['hhn','rip'],                 'HHN RIP TOUR'],
+  [['hhn'],                       'HHN 1D'],
+  [['seaworld'],                  'SeaWorld 1D'],
+  [['i-ride','iride'],            '1D I-RIDE'],
+  [['shuttle','superstar'],       'One-Way AD Superstar Shuttle'],
+  [['leaky','breakfast'],         'LEAKY CAULDRON BREAKFAST AD'],
+  [['broomsticks','breakfast'],   'THREE BROOMSTICKS BREAKFAST AD'],
+  [['marvel','dining'],           'MARVEL CHARACTER DINING AD'],
+  [['premium','seating'],         'PREMIUM SEATING'],
+];
 
 function _matchProductFromReceipt(name) {
-  const lower = name.toLowerCase();
-  const allProds = [];
-  PRODUCT_CATEGORIES.forEach(cat => {
-    cat.products.forEach(p => {
-      if (typeof p === 'string') allProds.push(p);
-      else if (p.items) p.items.forEach(item => allProds.push(item));
-      else if (p.name) allProds.push(p.name);
-    });
-  });
-  return allProds.find(p => {
-    const pl = p.toLowerCase();
-    return pl === lower || lower.includes(pl) || pl.includes(lower);
-  }) || null;
+  const tok = name.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ');
+  const words = tok.split(' ');
+  const has = (...kws) => kws.every(kw => words.some(w => w.includes(kw)));
+  for (const [kws, prod] of _RECEIPT_RULES) {
+    if (has(...kws)) return prod;
+  }
+  return null;
 }
 
 function openReceiptScanner() {
@@ -3499,22 +3558,30 @@ function openReceiptScanner() {
 }
 
 function _parseReceiptText(text) {
-  const SKIP = /^(total|sub.?total|tax|change|cash|credit|debit|visa|mastercard|amex|discover|balance|amount.?due|payment|tip|gratuity|thank|receipt|order#|server|table|guest|check|date|time|phone|fax|address|www\.|http|^\*+$|^-+$|^=+$)/i;
-  const PRICE_RE = /\$?\s*(\d{1,4}\.\d{2})\s*$/;
+  const SKIP = /^(total|sub.?total|tax|change|cash|credit|debit|visa|mastercard|amex|discover|balance|amount.?due|payment|tip|gratuity|thank|receipt|order#?|server|table|check|date|time|phone|fax|address|www\.|http|^\*+$|^-+$|^=+$|^\s*$)/i;
+  // Match price at end of line; also accept trailing T/N (taxable marker) or spaces
+  const PRICE_RE = /\$?\s*(\d{1,4}\.\d{2})\s*[TN]?\s*$/;
   const items = [];
-  for (const raw of text.split('\n')) {
-    const line = raw.trim();
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
     if (!line || SKIP.test(line)) continue;
     const m = line.match(PRICE_RE);
     if (!m) continue;
     const price = parseFloat(m[1]);
-    if (price <= 0 || price > 9999) continue;
-    let name = line.slice(0, m.index).trim().replace(/[\s.\-_]+$/, '').trim();
-    let qty = 1;
-    const qtyM = name.match(/^(\d+)\s*[@xX×]|^(\d+)\s+EA\s*/i);
-    if (qtyM) { qty = parseInt(qtyM[1] || qtyM[2]); name = name.slice(qtyM[0].length).trim(); }
+    if (price < 0.50 || price > 9999) continue; // skip tiny amounts (rounding artifacts)
+    let name = line.slice(0, m.index).trim().replace(/[\s.\-_|]+$/, '').trim();
+    // If name is empty, look at the line above as the product name
+    if ((!name || name.length < 2) && i > 0) {
+      const prev = lines[i - 1].trim();
+      if (prev && !SKIP.test(prev) && !prev.match(PRICE_RE)) name = prev;
+    }
     if (!name || name.length < 2) continue;
-    name = name.replace(/\s{2,}/g, ' ').replace(/[|]/g, 'I');
+    let qty = 1;
+    const qtyM = name.match(/^(\d+)\s*[@×xX][\s$]?|^(\d+)\s+(?:EA|PC|EACH)\s+/i);
+    if (qtyM) { qty = parseInt(qtyM[1] || qtyM[2]) || 1; name = name.slice(qtyM[0].length).trim(); }
+    name = name.replace(/\s{2,}/g, ' ').replace(/[|]/g, 'I').replace(/\s+[TN]$/, '').trim();
+    if (!name || name.length < 2) continue;
     items.push({ name, qty, unitPrice: qty > 1 ? Math.round(price/qty*100)/100 : price, lineTotal: price });
   }
   return items;
@@ -3563,11 +3630,15 @@ async function handleReceiptFile(input) {
       if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || 'Server error'); }
       data = await resp.json();
     } catch(fe) { clearTimeout(timer); throw fe; }
-    const items = _parseReceiptText(data.text || '').map(it => ({
+    _rawOcrText = data.text || '';
+    const items = _parseReceiptText(_rawOcrText).map(it => ({
       ...it, matchedProduct: _matchProductFromReceipt(it.name), confirmed: true
     }));
     if (!items.length) {
-      loadingEl.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">No line items found.<br><span style="font-size:11px">Try a flat, well-lit photo straight on.</span></div>';
+      loadingEl.innerHTML = `<div style="text-align:center;padding:16px">
+        <div style="color:var(--text3);font-size:13px;margin-bottom:10px">No line items found. Try a flat, well-lit photo straight on.</div>
+        ${_rawOcrText ? `<details style="text-align:left;font-size:11px;color:var(--text3)"><summary style="cursor:pointer;margin-bottom:4px">Show raw OCR text</summary><pre style="white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;background:var(--bg2);padding:8px;border-radius:var(--radius)">${_rawOcrText.replace(/</g,'&lt;')}</pre></details>` : ''}
+      </div>`;
       return;
     }
     _scannedItems = items;
@@ -3580,25 +3651,23 @@ async function handleReceiptFile(input) {
 function renderReceiptItems() {
   const el = document.getElementById('receiptScanItems');
   if (!_scannedItems.length) { el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px">No items.</div>'; return; }
-  const allProds = [];
-  PRODUCT_CATEGORIES.forEach(cat => {
-    cat.products.forEach(p => {
-      if (typeof p === 'string') allProds.push(p);
-      else if (p.items) p.items.forEach(i => allProds.push(i));
-      else if (p.name) allProds.push(p.name);
-    });
-  });
-  el.innerHTML = _scannedItems.map((it, idx) => `
+  // Build grouped <optgroup> dropdown once
+  const optgroups = PRODUCT_CATEGORIES.map(cat =>
+    `<optgroup label="${cat.name}">${cat.products.map(p => `<option value="${p}">${p}</option>`).join('')}</optgroup>`
+  ).join('');
+  const rawHtml = _rawOcrText ? `<details style="margin-bottom:8px;font-size:11px;color:var(--text3)"><summary style="cursor:pointer;padding:4px 0">Show raw OCR text</summary><pre style="white-space:pre-wrap;word-break:break-all;max-height:160px;overflow-y:auto;background:var(--bg2);padding:8px;border-radius:var(--radius);margin-top:4px;font-size:10px">${_rawOcrText.replace(/</g,'&lt;')}</pre></details>` : '';
+  el.innerHTML = rawHtml + '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Verify each item and correct the product if needed, then tap Add to sales.</div>' +
+    _scannedItems.map((it, idx) => `
     <div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid var(--border);font-size:13px">
-      <input type="checkbox" id="scan-cb-${idx}" ${it.confirmed?'checked':''} onchange="_scannedItems[${idx}].confirmed=this.checked" style="margin-top:3px;cursor:pointer">
-      <div style="flex:1">
-        <div style="font-weight:600;color:var(--text)">${it.name}${it.qty>1?' ×'+it.qty:''}</div>
-        <select onchange="_scannedItems[${idx}].matchedProduct=this.value||null" style="margin-top:4px;width:100%;font-size:12px;padding:4px 6px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
-          <option value="">— no match —</option>
-          ${allProds.map(p => `<option value="${p}" ${it.matchedProduct===p?'selected':''}>${p}</option>`).join('')}
+      <input type="checkbox" ${it.confirmed?'checked':''} onchange="_scannedItems[${idx}].confirmed=this.checked" style="margin-top:3px;cursor:pointer;flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;color:var(--text);font-size:12px;margin-bottom:3px">${it.name}${it.qty>1?' ×'+it.qty:''}</div>
+        <select onchange="_scannedItems[${idx}].matchedProduct=this.value||null" style="width:100%;font-size:12px;padding:4px 6px;border-radius:var(--radius);border:1px solid ${it.matchedProduct?'var(--border2)':'var(--amber-mid,#d97706)'};background:var(--bg);color:var(--text);font-family:inherit">
+          <option value="">— select product —</option>
+          ${optgroups.replace(`value="${it.matchedProduct}"`, `value="${it.matchedProduct}" selected`)}
         </select>
       </div>
-      <div style="text-align:right;white-space:nowrap;font-weight:700;color:var(--text)">${fmtD(it.lineTotal||it.unitPrice||0)}</div>
+      <div style="text-align:right;white-space:nowrap;font-weight:700;color:var(--text);padding-top:2px">${fmtD(it.lineTotal||it.unitPrice||0)}</div>
     </div>`).join('');
 }
 
