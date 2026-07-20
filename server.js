@@ -616,7 +616,7 @@ Rules:
 - Keep product names exactly as they appear on the receipt`;
 
   const body = JSON.stringify({
-    model: 'meta-llama/llama-3.2-11b-vision-instruct:free',
+    model: 'openrouter/free',
     messages: [{ role: 'user', content: [
       { type: 'image_url', image_url: { url: `data:${mimeType};base64,${image}` } },
       { type: 'text', text: prompt }
