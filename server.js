@@ -66,8 +66,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
     "font-src https://cdn.jsdelivr.net https://unpkg.com",
     "img-src 'self' data:",
-    "connect-src 'self' https://cdn.jsdelivr.net https://tessdata.projectnaptha.com",
-    "worker-src blob: 'self'",
+    "connect-src 'self'",
   ].join('; '));
   if (req.headers['x-forwarded-proto'] === 'https')
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
@@ -597,6 +596,39 @@ app.post('/api/chat', auth, (req, res) => {
   res.json({ ok: true, msg });
 });
 
+
+// ── Receipt scanner (OCR.space — free, no key needed) ────────
+app.post('/api/scan-receipt', auth, async (req, res) => {
+  const { image, mimeType } = req.body || {};
+  if (!image || !mimeType) return res.status(400).json({ error: 'image and mimeType required' });
+  const apiKey = process.env.OCR_SPACE_KEY || 'helloworld';
+  const payload = new URLSearchParams({
+    apikey: apiKey,
+    base64Image: `data:${mimeType};base64,${image}`,
+    language: 'eng',
+    OCREngine: '2',
+    scale: 'true',
+    detectOrientation: 'true'
+  }).toString();
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const buf = Buffer.from(payload);
+      const r = https.request({
+        hostname: 'api.ocr.space', path: '/parse/image', method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': buf.length }
+      }, resp => {
+        let d = ''; resp.on('data', c => d += c);
+        resp.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
+      });
+      r.on('error', reject); r.write(buf); r.end();
+    });
+    if (result.IsErroredOnProcessing) return res.status(502).json({ error: result.ErrorMessage?.[0] || 'OCR failed' });
+    res.json({ text: result.ParsedResults?.[0]?.ParsedText || '' });
+  } catch (err) {
+    console.error('scan-receipt:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to process receipt' });
+  }
+});
 
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;

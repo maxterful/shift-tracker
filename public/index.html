@@ -15,7 +15,6 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js" defer crossorigin="anonymous"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -3546,37 +3545,25 @@ async function handleReceiptFile(input) {
   const modal = document.getElementById('receiptScanModal');
   const loadingEl = document.getElementById('receiptScanItems');
   modal.style.display = 'flex';
-
-  const setStatus = (msg, pct) => {
-    loadingEl.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3)">
-      <div style="margin-bottom:8px">${msg}</div>
-      ${pct != null ? `<div style="background:var(--border);border-radius:99px;height:4px;overflow:hidden"><div style="background:var(--blue-mid,#2563eb);height:100%;width:${pct}%;transition:width .3s"></div></div>` : ''}
-    </div>`;
-  };
-
-  setStatus('Waiting for OCR engine…');
+  loadingEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3)">Reading receipt…</div>';
   try {
-    // Wait for the deferred Tesseract script to be ready (up to 15s)
-    if (!window.Tesseract) {
-      await new Promise((resolve, reject) => {
-        let tries = 0;
-        const id = setInterval(() => {
-          if (window.Tesseract) { clearInterval(id); resolve(); }
-          else if (++tries > 30) { clearInterval(id); reject(new Error('OCR engine failed to load — try refreshing the page')); }
-        }, 500);
-      });
-    }
-    setStatus('Preparing image…', 5);
-    const resized = await _resizeForOCR(file, 1800);
-    setStatus('Reading receipt… 0%', 5);
-    const { data: { text } } = await Tesseract.recognize(resized, 'eng', {
-      logger: m => {
-        if (m.status === 'recognizing text') setStatus(`Reading receipt… ${Math.round(m.progress*100)}%`, 10 + Math.round(m.progress*88));
-        else if (m.status === 'loading language traineddata') setStatus('Downloading language data… (first time only)', 8);
-        else if (m.status === 'initializing api') setStatus('Initializing OCR…', 6);
-      }
+    const resized = await _resizeForOCR(file, 1200);
+    const base64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(',')[1]);
+      r.onerror = rej;
+      r.readAsDataURL(resized);
     });
-    const items = _parseReceiptText(text).map(it => ({
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 30000);
+    let data;
+    try {
+      const resp = await fetch('/api/scan-receipt', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ image: base64, mimeType: file.type || 'image/jpeg' }), signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.error || 'Server error'); }
+      data = await resp.json();
+    } catch(fe) { clearTimeout(timer); throw fe; }
+    const items = _parseReceiptText(data.text || '').map(it => ({
       ...it, matchedProduct: _matchProductFromReceipt(it.name), confirmed: true
     }));
     if (!items.length) {
