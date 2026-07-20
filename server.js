@@ -596,37 +596,31 @@ app.post('/api/chat', auth, (req, res) => {
   res.json({ ok: true, msg });
 });
 
-// ── Receipt scanner ────────────────────────────────────────
+// ── Receipt scanner (Google Gemini — free tier) ─────────────
 app.post('/api/scan-receipt', auth, express.json({ limit: '12mb' }), async (req, res) => {
   const { image, mimeType } = req.body || {};
   if (!image || !mimeType) return res.status(400).json({ error: 'image and mimeType required' });
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'Receipt scanning not configured — add ANTHROPIC_API_KEY in Railway environment variables' });
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'Receipt scanning not configured — add GEMINI_API_KEY in Railway environment variables (free at aistudio.google.com)' });
 
   const payload = JSON.stringify({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1024,
-    messages: [{
-      role: 'user',
-      content: [
-        { type: 'image', source: { type: 'base64', media_type: mimeType, data: image } },
-        { type: 'text', text: 'This is a Universal Orlando point-of-sale receipt. Extract each purchased line item. Return ONLY a JSON array, nothing else, no markdown. Each element: {"name": string, "qty": number, "unitPrice": number, "lineTotal": number}. Skip: tax lines, subtotals, grand totals, payment method lines, header/footer text. If qty is not shown assume 1. Prices as plain USD numbers (no $ sign).' }
+    contents: [{
+      parts: [
+        { inline_data: { mime_type: mimeType, data: image } },
+        { text: 'This is a Universal Orlando point-of-sale receipt. Extract each purchased line item. Return ONLY a JSON array, nothing else, no markdown fences. Each element: {"name": string, "qty": number, "unitPrice": number, "lineTotal": number}. Skip: tax lines, subtotals, grand totals, payment method lines, header/footer text. If qty is not shown assume 1. Prices as plain USD numbers (no $ sign).' }
       ]
-    }]
+    }],
+    generationConfig: { maxOutputTokens: 1024 }
   });
 
   try {
     const result = await new Promise((resolve, reject) => {
+      const path = `/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
       const options = {
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
+        hostname: 'generativelanguage.googleapis.com',
+        path,
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Length': Buffer.byteLength(payload)
-        }
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
       };
       const r = https.request(options, resp => {
         let d = '';
@@ -638,7 +632,7 @@ app.post('/api/scan-receipt', auth, express.json({ limit: '12mb' }), async (req,
       r.end();
     });
 
-    const text = result.content?.[0]?.text || '[]';
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
     let items;
     try {
       const m = text.match(/\[[\s\S]*\]/);
