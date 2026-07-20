@@ -66,7 +66,8 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
     "font-src https://cdn.jsdelivr.net https://unpkg.com",
     "img-src 'self' data:",
-    "connect-src 'self'",
+    "connect-src 'self' https://cdn.jsdelivr.net https://tessdata.projectnaptha.com",
+    "worker-src blob: 'self'",
   ].join('; '));
   if (req.headers['x-forwarded-proto'] === 'https')
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
@@ -596,59 +597,6 @@ app.post('/api/chat', auth, (req, res) => {
   res.json({ ok: true, msg });
 });
 
-// ── Receipt scanner (Google Gemini — free tier) ─────────────
-app.post('/api/scan-receipt', auth, async (req, res) => {
-  const { image, mimeType } = req.body || {};
-  if (!image || !mimeType) return res.status(400).json({ error: 'image and mimeType required' });
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'Receipt scanning not configured — add GEMINI_API_KEY in Railway environment variables (free at aistudio.google.com)' });
-
-  const payload = JSON.stringify({
-    contents: [{
-      parts: [
-        { inline_data: { mime_type: mimeType, data: image } },
-        { text: 'This is a Universal Orlando point-of-sale receipt. Extract each purchased line item. Return ONLY a JSON array, nothing else, no markdown fences. Each element: {"name": string, "qty": number, "unitPrice": number, "lineTotal": number}. Skip: tax lines, subtotals, grand totals, payment method lines, header/footer text. If qty is not shown assume 1. Prices as plain USD numbers (no $ sign).' }
-      ]
-    }],
-    generationConfig: { maxOutputTokens: 1024 }
-  });
-
-  try {
-    const result = await new Promise((resolve, reject) => {
-      const apiPath = `/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const options = {
-        hostname: 'generativelanguage.googleapis.com',
-        path: apiPath,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
-      };
-      const r = https.request(options, resp => {
-        let d = '';
-        resp.on('data', c => d += c);
-        resp.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
-      });
-      r.on('error', reject);
-      r.write(payload);
-      r.end();
-    });
-
-    if (result.error) {
-      console.error('Gemini API error:', result.error);
-      return res.status(502).json({ error: result.error.message || 'Gemini API error' });
-    }
-
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-    let items;
-    try {
-      const m = text.match(/\[[\s\S]*\]/);
-      items = m ? JSON.parse(m[0]) : [];
-    } catch { items = []; }
-    res.json({ items });
-  } catch (err) {
-    console.error('scan-receipt error:', err.message);
-    res.status(500).json({ error: err.message || 'Failed to parse receipt' });
-  }
-});
 
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
