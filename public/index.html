@@ -1122,13 +1122,44 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
         <div id="priceSaveMsg" style="font-size:12px;color:var(--green-mid);min-height:16px;margin-top:4px"></div>
       </div>
     </div>
+    <div class="card" id="adminCatalogCard" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="section-title" style="margin:0">Catalog editor</div>
+        <div style="display:flex;gap:6px">
+          <button class="lb-subtab active" id="catalogTabProducts" onclick="switchCatalogTab('products',this)">Products</button>
+          <button class="lb-subtab" id="catalogTabHotels" onclick="switchCatalogTab('hotels',this)">Hotels</button>
+        </div>
+      </div>
+      <div id="catalogProductsPanel">
+        <div id="catalogCategoryList"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <input type="text" id="newCatName" placeholder="New category name…" style="flex:1;font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+          <input type="color" id="newCatColor" value="#475569" style="width:36px;height:36px;border:none;border-radius:var(--radius);cursor:pointer;padding:2px;background:transparent">
+          <button class="btn btn-sm btn-primary" onclick="addCatalogCategory()">Add</button>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="saveCatalogProducts()"><i class="ti ti-device-floppy" style="margin-right:5px"></i>Save products</button>
+      </div>
+      <div id="catalogHotelsPanel" style="display:none">
+        <div id="catalogHotelList"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <input type="text" id="newHotelName" placeholder="Hotel name…" style="flex:1;min-width:160px;font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit" onkeydown="if(event.key==='Enter')addCatalogHotel()">
+          <select id="newHotelTier" style="font-size:13px;padding:7px 10px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+            <option value="Premier">Premier</option>
+            <option value="Non-Premier">Non-Premier</option>
+            <option value="UPH">UPH</option>
+          </select>
+          <button class="btn btn-sm btn-primary" onclick="addCatalogHotel()">Add</button>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="saveCatalogHotels()"><i class="ti ti-device-floppy" style="margin-right:5px"></i>Save hotels</button>
+      </div>
+    </div>
   </div>
 
 </div><!-- .app -->
 
 <script>
 // ─── Constants ──────────────────────────────────────────────
-const PRODUCT_CATEGORIES = [
+let PRODUCT_CATEGORIES = [
   { name: 'Epic Universe', color: '#7C3AED', icon: 'ti-planet', products: [
     'Epic Universe 1D AD', 'Epic Universe 1D CH', '1D EPIC AP AD', 'Epic After 2PM Guest Recovery'
   ]},
@@ -1270,7 +1301,7 @@ const PRODUCT_PRICES = {
   'SeaWorld 1D': 109.69,
 };
 
-const HOTEL_TIERS = {
+let HOTEL_TIERS = {
   'Premier': [
     'Loews Portofino Bay Hotel','Hard Rock Hotel','Loews Royal Pacific Resort',
   ],
@@ -1407,6 +1438,14 @@ const apiPut    = (p, b)  => apiFetch('PUT',    p, b);
 const apiPost   = (p, b)  => apiFetch('POST',   p, b);
 const apiPatch  = (p, b)  => apiFetch('PATCH',  p, b);
 const apiDelete = p       => apiFetch('DELETE', p);
+
+async function loadConfig() {
+  try {
+    const cfg = await apiGet('/api/config');
+    if (Array.isArray(cfg?.products) && cfg.products.length) PRODUCT_CATEGORIES = cfg.products;
+    if (cfg?.hotels && typeof cfg.hotels === 'object' && !Array.isArray(cfg.hotels) && Object.keys(cfg.hotels).length) HOTEL_TIERS = cfg.hotels;
+  } catch {}
+}
 
 function setSyncUI(status, label) {
   const dot = document.getElementById('syncDot');
@@ -1746,6 +1785,7 @@ async function enterApp(freshLogin = false) {
   // Render local state and boot UI immediately — never block on server
   const local = lsGet(lsStateKey(), null);
   if (local) { state = { ...state, ...local }; syncUIToState(); }
+  await loadConfig();
   render();
   buildHotelSelect();
   renderCategoryPills();
@@ -3968,6 +4008,8 @@ function showAdminUI() {
   document.getElementById('claimAdminCard').style.display = isAdmin ? 'none' : '';
   document.getElementById('adminPanelCard').style.display = isAdmin ? '' : 'none';
   if (isAdmin) loadAdminPanel();
+  document.getElementById('adminCatalogCard').style.display = isAdmin ? '' : 'none';
+  if (isAdmin) initCatalogEditor();
 }
 
 async function claimAdmin() {
@@ -4108,6 +4150,128 @@ async function deleteAdminUser(id, name) {
     loadAdminPanel();
   } catch(e) {
     alert('Failed: ' + (e.message === '400' ? 'Cannot remove yourself.' : 'Server error.'));
+  }
+}
+
+// ─── Catalog editor ───────────────────────────────────────────
+let _editProducts = null;
+let _editHotels   = null;
+
+function switchCatalogTab(tab, btn) {
+  document.querySelectorAll('#adminCatalogCard .lb-subtab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('catalogProductsPanel').style.display = tab === 'products' ? '' : 'none';
+  document.getElementById('catalogHotelsPanel').style.display   = tab === 'hotels'   ? '' : 'none';
+}
+
+function initCatalogEditor() {
+  _editProducts = PRODUCT_CATEGORIES.map(c => ({
+    name: c.name, color: c.color || '#475569', icon: c.icon || 'ti-tag',
+    products: [...(c.products || [])]
+  }));
+  _editHotels = Object.fromEntries(Object.entries(HOTEL_TIERS).map(([k,v]) => [k, [...v]]));
+  renderCatalogProducts();
+  renderCatalogHotels();
+}
+
+function renderCatalogProducts() {
+  const el = document.getElementById('catalogCategoryList');
+  if (!el || !_editProducts) return;
+  el.innerHTML = _editProducts.map((cat, ci) => `
+    <details style="border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:6px;overflow:hidden">
+      <summary style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);cursor:pointer;list-style:none">
+        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};flex-shrink:0"></span>
+        <span style="flex:1;font-size:13px;font-weight:600">${cat.name}</span>
+        <span style="font-size:11px;color:var(--text3)">${cat.products.length} products</span>
+        <button class="btn btn-danger btn-sm" onclick="event.preventDefault();_editProducts.splice(${ci},1);renderCatalogProducts()" style="padding:2px 8px;font-size:11px">Delete</button>
+      </summary>
+      <div style="padding:10px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--text3)">Name:</span>
+          <input type="text" value="${cat.name.replace(/"/g,'&quot;')}" onchange="_editProducts[${ci}].name=this.value" style="flex:1;font-size:13px;padding:4px 7px;border-radius:4px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+          <span style="font-size:11px;color:var(--text3)">Color:</span>
+          <input type="color" value="${cat.color}" onchange="_editProducts[${ci}].color=this.value" style="width:28px;height:28px;border:none;border-radius:4px;cursor:pointer;padding:2px;background:transparent">
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+          ${cat.products.map((p,pi) => `<span style="font-size:11px;padding:2px 6px 2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--border2);display:inline-flex;align-items:center;gap:4px">${p.replace(/</g,'&lt;')}<button onclick="_editProducts[${ci}].products.splice(${pi},1);renderCatalogProducts()" style="border:none;background:none;color:var(--text3);cursor:pointer;padding:0;font-size:12px;line-height:1;margin-left:2px">×</button></span>`).join('')}
+        </div>
+        <div style="display:flex;gap:6px">
+          <input type="text" placeholder="Add product…" id="newProd_${ci}" style="flex:1;font-size:12px;padding:5px 8px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit" onkeydown="if(event.key==='Enter'){addCatalogProduct(${ci});event.preventDefault()}">
+          <button class="btn btn-sm" onclick="addCatalogProduct(${ci})">Add product</button>
+        </div>
+      </div>
+    </details>
+  `).join('');
+}
+
+function addCatalogProduct(ci) {
+  const inp = document.getElementById('newProd_' + ci);
+  const val = (inp?.value || '').trim();
+  if (!val || !_editProducts[ci]) return;
+  if (!_editProducts[ci].products.includes(val)) _editProducts[ci].products.push(val);
+  inp.value = '';
+  renderCatalogProducts();
+}
+
+function addCatalogCategory() {
+  const nameInp  = document.getElementById('newCatName');
+  const colorInp = document.getElementById('newCatColor');
+  const name = nameInp.value.trim();
+  if (!name) return;
+  _editProducts.push({ name, color: colorInp?.value || '#475569', icon: 'ti-tag', products: [] });
+  nameInp.value = '';
+  renderCatalogProducts();
+}
+
+async function saveCatalogProducts() {
+  try {
+    await apiPut('/api/admin/config/products', _editProducts);
+    PRODUCT_CATEGORIES = _editProducts.map(c => ({ ...c, products: [...c.products] }));
+    renderCategoryPills();
+    alert('Products saved.');
+  } catch(e) {
+    alert('Save failed: ' + (e?.message || 'Server error'));
+  }
+}
+
+function renderCatalogHotels() {
+  const el = document.getElementById('catalogHotelList');
+  if (!el || !_editHotels) return;
+  const tierSel = document.getElementById('newHotelTier');
+  if (tierSel) tierSel.innerHTML = Object.keys(_editHotels).map(t => `<option value="${t}">${t}</option>`).join('');
+  el.innerHTML = Object.entries(_editHotels).map(([tier, hotels]) => `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${tier}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${hotels.map((h, hi) => `<span style="font-size:12px;padding:3px 8px 3px 10px;border-radius:99px;background:var(--bg2);border:1px solid var(--border2);display:inline-flex;align-items:center;gap:5px">${h.replace(/</g,'&lt;')}<button onclick="deleteCatalogHotel(${JSON.stringify(tier)},${hi})" style="border:none;background:none;color:var(--text3);cursor:pointer;padding:0;font-size:13px;line-height:1">×</button></span>`).join('')}
+        ${!hotels.length ? '<span style="font-size:12px;color:var(--text3);font-style:italic">No hotels</span>' : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function deleteCatalogHotel(tier, hi) {
+  if (_editHotels[tier]) { _editHotels[tier].splice(hi, 1); renderCatalogHotels(); }
+}
+
+function addCatalogHotel() {
+  const name = (document.getElementById('newHotelName')?.value || '').trim();
+  const tier = document.getElementById('newHotelTier')?.value;
+  if (!name || !tier) return;
+  if (!_editHotels[tier]) _editHotels[tier] = [];
+  if (!_editHotels[tier].includes(name)) _editHotels[tier].push(name);
+  document.getElementById('newHotelName').value = '';
+  renderCatalogHotels();
+}
+
+async function saveCatalogHotels() {
+  try {
+    await apiPut('/api/admin/config/hotels', _editHotels);
+    HOTEL_TIERS = Object.fromEntries(Object.entries(_editHotels).map(([k,v]) => [k, [...v]]));
+    buildHotelSelect();
+    alert('Hotels saved.');
+  } catch(e) {
+    alert('Save failed: ' + (e?.message || 'Server error'));
   }
 }
 

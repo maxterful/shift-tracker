@@ -19,6 +19,7 @@ const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
 
 function ensure(p) { if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true }); }
 ensure(path.join(DATA, 'users'));
+ensure(path.join(DATA, 'config'));
 
 function read(file, fallback) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
@@ -234,6 +235,32 @@ app.post('/api/admin/demote/:id', adminAuth, (req, res) => {
   if (idx === -1) return res.status(404).json({ error: 'User not found' });
   all[idx].isAdmin = false;
   write(path.join(DATA, 'users.json'), all);
+  res.json({ ok: true });
+});
+
+// ── Config: products & hotels (editable by admin) ──────────
+app.get('/api/config', (_req, res) => {
+  const dir = path.join(DATA, 'config');
+  const pf  = path.join(dir, 'products.json');
+  const hf  = path.join(dir, 'hotels.json');
+  res.json({
+    products: fs.existsSync(pf) ? read(pf, null) : null,
+    hotels:   fs.existsSync(hf) ? read(hf, null) : null,
+  });
+});
+
+app.put('/api/admin/config/products', adminAuth, (req, res) => {
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Expected array' });
+  ensure(path.join(DATA, 'config'));
+  write(path.join(DATA, 'config', 'products.json'), req.body);
+  res.json({ ok: true });
+});
+
+app.put('/api/admin/config/hotels', adminAuth, (req, res) => {
+  const h = req.body;
+  if (!h || typeof h !== 'object' || Array.isArray(h)) return res.status(400).json({ error: 'Expected object' });
+  ensure(path.join(DATA, 'config'));
+  write(path.join(DATA, 'config', 'hotels.json'), h);
   res.json({ ok: true });
 });
 
