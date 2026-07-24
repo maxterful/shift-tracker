@@ -216,6 +216,16 @@ app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Admin: grant admin to another user ────────────────────
+app.post('/api/admin/grant/:id', adminAuth, (req, res) => {
+  const all = read(path.join(DATA, 'users.json'), []);
+  const idx = all.findIndex(u => u.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'User not found' });
+  all[idx].isAdmin = true;
+  write(path.join(DATA, 'users.json'), all);
+  res.json({ ok: true });
+});
+
 // ── Admin: revoke admin from another user ─────────────────
 app.post('/api/admin/demote/:id', adminAuth, (req, res) => {
   if (req.params.id === req.uid) return res.status(400).json({ error: 'Cannot demote yourself' });

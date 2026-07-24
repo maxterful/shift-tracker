@@ -3988,6 +3988,10 @@ async function loadAdminPanel() {
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
           <button class="btn btn-sm" onclick="viewUserData('${u.id}','${u.name.replace(/'/g,"\\'")}')">Data</button>
+          ${u.id!==currentUser?.id?(u.isAdmin
+            ?`<button class="btn btn-sm" style="border-color:var(--amber-mid,#d97706);color:var(--amber-mid,#d97706)" onclick="setAdminRole('${u.id}','${u.name.replace(/'/g,"\\'")}',false)">Revoke admin</button>`
+            :`<button class="btn btn-sm" onclick="setAdminRole('${u.id}','${u.name.replace(/'/g,"\\'")}',true)">Make admin</button>`
+          ):''}
           ${u.id!==currentUser?.id?`<button class="btn btn-danger btn-sm" onclick="deleteAdminUser('${u.id}','${u.name.replace(/'/g,"\\'")}')">Remove</button>`:''}
         </div>
       </div>`).join('') +
@@ -4055,6 +4059,17 @@ async function recalcCommissions() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<i class="ti ti-calculator" style="margin-right:5px"></i>Recalculate commissions for all users';
+  }
+}
+
+async function setAdminRole(id, name, grant) {
+  const action = grant ? `Make ${name} an admin?` : `Revoke admin from ${name}?`;
+  if (!confirm(action)) return;
+  try {
+    await apiPost(grant ? `/api/admin/grant/${id}` : `/api/admin/demote/${id}`, {});
+    loadAdminPanel();
+  } catch(e) {
+    alert('Failed: ' + (e?.message || 'Server error.'));
   }
 }
 
