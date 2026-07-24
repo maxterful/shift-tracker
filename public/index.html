@@ -937,7 +937,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
           <button class="period-tab" onclick="setCommPeriod('week',this)">This week</button>
           <button class="period-tab" onclick="setCommPeriod('month',this)">This month</button>
           <button class="period-tab" onclick="setCommPeriod('alltime',this)">All time</button>
+          <button class="period-tab" onclick="setCommPeriod('custom',this)">Date range</button>
         </div>
+      </div>
+      <div id="commDateRange" style="display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <input type="date" id="commDateFrom" onchange="renderWeeklyComm()" style="font-size:13px;padding:6px 8px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
+        <span style="color:var(--text3);font-size:13px">to</span>
+        <input type="date" id="commDateTo" onchange="renderWeeklyComm()" style="font-size:13px;padding:6px 8px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg);color:var(--text);font-family:inherit">
       </div>
       <div id="monthlyProjBanner" style="display:none;background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:13px">
         <div style="font-weight:700;color:var(--green-mid)" id="monthlyProjTitle">Monthly projection</div>
@@ -2695,6 +2701,20 @@ function setCommPeriod(period, btn) {
   _commPeriod = period;
   btn.closest('.period-tabs').querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  const rangeRow = document.getElementById('commDateRange');
+  if (rangeRow) {
+    if (period === 'custom') {
+      rangeRow.style.display = 'flex';
+      // Default to current month if dates not yet set
+      const today = new Date().toISOString().slice(0,10);
+      const fromEl = document.getElementById('commDateFrom');
+      const toEl   = document.getElementById('commDateTo');
+      if (!fromEl.value) { const d = new Date(); d.setDate(1); fromEl.value = d.toISOString().slice(0,10); }
+      if (!toEl.value)   toEl.value = today;
+    } else {
+      rangeRow.style.display = 'none';
+    }
+  }
   renderWeeklyComm();
 }
 
@@ -2705,7 +2725,15 @@ async function renderWeeklyComm() {
   const projTitle  = document.getElementById('monthlyProjTitle');
   const projSub    = document.getElementById('monthlyProjSub');
   try {
-    const board = await _cachedLeaderboard(_commPeriod);
+    let board;
+    if (_commPeriod === 'custom') {
+      const from = document.getElementById('commDateFrom')?.value || '';
+      const to   = document.getElementById('commDateTo')?.value   || '';
+      if (!from || !to) { el.innerHTML = '<div class="empty-state">Pick a start and end date above.</div>'; return; }
+      board = await apiGet(`/api/leaderboard?period=custom&from=${from}&to=${to}&tz=${new Date().getTimezoneOffset()}`);
+    } else {
+      board = await _cachedLeaderboard(_commPeriod);
+    }
     const sorted = [...(board || [])].sort((a,b) => b.totalCommission - a.totalCommission).filter(r => r.totalCommission > 0);
 
     // Show/hide monthly projection for current user
@@ -2726,7 +2754,7 @@ async function renderWeeklyComm() {
     } else if (projBanner) {
       projBanner.style.display = 'none';
     }
-    const periodLabel = { today:'today', week:'this week', month:'this month', alltime:'yet' }[_commPeriod] || '';
+    const periodLabel = { today:'today', week:'this week', month:'this month', alltime:'yet', custom:'in that range' }[_commPeriod] || '';
     if (!sorted.length) { el.innerHTML = `<div class="empty-state">No commission earned ${periodLabel}</div>`; return; }
     el.innerHTML = sorted.map((row, i) => {
       const isMe = row.user.id === currentUser?.id;

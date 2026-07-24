@@ -422,10 +422,13 @@ app.get('/api/leaderboard', (_req, res) => {
 
   const board = users.map(user => {
     const hist = read(path.join(DATA, 'users', user.id, 'history.json'), []);
+    const customFrom = _req.query.from ? new Date(_req.query.from + 'T00:00:00').getTime() : 0;
+    const customTo   = _req.query.to   ? new Date(_req.query.to   + 'T23:59:59').getTime() : Date.now();
     const rows = hist.filter(h => {
-      if (period === 'today') return (h.shiftEnd || 0) >= dayStart;
-      if (period === 'week')  return (h.shiftEnd || 0) >= wkStart;
-      if (period === 'month') return (h.shiftEnd || 0) >= moStart;
+      if (period === 'today')  return (h.shiftEnd || 0) >= dayStart;
+      if (period === 'week')   return (h.shiftEnd || 0) >= wkStart;
+      if (period === 'month')  return (h.shiftEnd || 0) >= moStart;
+      if (period === 'custom') return (h.shiftEnd || 0) >= customFrom && (h.shiftEnd || 0) <= customTo;
       return true;
     });
     const totalSales      = rows.reduce((a, h) => a + (h.totalSales      || 0), 0);
